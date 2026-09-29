@@ -71,16 +71,24 @@ type MockOpts = {
   body?: unknown
 }
 
+export type MockResponse = {
+  status: number
+  json: object | string
+  headers?: Record<string, string>
+}
+
 export async function withCrispMock(
-  response: { status: number; json: object | string; headers?: Record<string, string> },
+  response: MockResponse | MockResponse[],
   fn: (dispatcher: Dispatcher) => Promise<void>,
 ): Promise<Captured[]> {
+  const responses = Array.isArray(response) ? response : [response]
   const agent = new MockAgent()
   agent.disableNetConnect()
   const pool = agent.get("https://api.crisp.chat")
   const calls: Captured[] = []
   for (const method of ["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD"]) {
     pool.intercept({ path: () => true, method }).reply((opts: MockOpts) => {
+      const current = responses[Math.min(calls.length, responses.length - 1)] ?? responses[0]
       calls.push({
         method: String(opts.method ?? method),
         path: String(opts.path ?? ""),
@@ -88,16 +96,16 @@ export async function withCrispMock(
         headers: headerMap(opts.headers),
       })
       return {
-        statusCode: response.status,
-        data: response.json,
+        statusCode: current?.status ?? 500,
+        data: current?.json ?? {},
         responseOptions: {
           headers: {
             "content-type": "application/json",
-            ...(response.headers ?? {}),
+            ...(current?.headers ?? {}),
           },
         },
       }
-    })
+    }).persist()
   }
   try {
     await fn(agent)

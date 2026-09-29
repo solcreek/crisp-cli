@@ -78,8 +78,7 @@ export function saveConfig(env: NodeJS.ProcessEnv, config: ConfigFile): void {
   const tmp = `${path}.${process.pid}.tmp`
   const data = `${JSON.stringify(config, null, 2)}\n`
   try {
-    mkdirSync(dir, { recursive: true, mode: 0o700 })
-    chmodSync(dir, 0o700)
+    ensureCreatedDirectories(dir)
     writeFileSync(tmp, data, { mode: 0o600 })
     chmodSync(tmp, 0o600)
     renameSync(tmp, path)
@@ -94,6 +93,27 @@ export function saveConfig(env: NodeJS.ProcessEnv, config: ConfigFile): void {
       throw err
     }
     throw new ConfigError("could not write config file")
+  }
+}
+
+function ensureCreatedDirectories(dir: string): void {
+  const missing: string[] = []
+  let cursor = dir
+  while (!existsSync(cursor)) {
+    missing.push(cursor)
+    const parent = dirname(cursor)
+    if (parent === cursor) break
+    cursor = parent
+  }
+  for (const path of missing.reverse()) {
+    try {
+      mkdirSync(path, { mode: 0o700 })
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === "EEXIST") continue
+      throw err
+    }
+    chmodSync(path, 0o700)
   }
 }
 

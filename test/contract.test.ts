@@ -122,9 +122,9 @@ const verbs: Verb[] = [
   },
   {
     name: "people get",
-    argv: ["people", "get", "ada@example.com"],
+    argv: ["people", "get", "people_1"],
     method: "GET",
-    path: `${site}/people/profile/${encodeURIComponent("ada@example.com")}`,
+    path: `${site}/people/profile/people_1`,
     body: null,
   },
   {
@@ -206,6 +206,81 @@ for (const verb of verbs) {
     })
   }
 }
+
+test("people get email searches then fetches the matching people_id", async () => {
+  const env = credentialEnv()
+  const io = buffers()
+  const profile = { people_id: "people_1", email: "ada@example.com" }
+  try {
+    const calls = await withCrispMock([
+      {
+        status: 200,
+        json: okEnvelope([
+          { people_id: "other", email: "ada@example.com.extra" },
+          profile,
+        ]),
+      },
+      { status: 200, json: okEnvelope(profile) },
+    ], async (dispatcher) => {
+      const code = await run(["--json", "people", "get", "Ada@Example.com"], { ...io, env, dispatcher })
+      assert.equal(code, 0)
+      assert.deepEqual(JSON.parse(io.out()), profile)
+    })
+    assert.equal(calls.length, 2)
+    assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=Ada@Example.com`)
+    assertUrl(calls[1]?.path ?? "", `${site}/people/profile/people_1`)
+    assert.equal(calls[1]?.path.includes("Ada"), false)
+    assert.equal(calls[1]?.path.includes("%40"), false)
+  } finally {
+    removeHome(env)
+  }
+})
+
+for (const status of [400, 429]) {
+  test(`people get email HTTP ${status} stays on the search route`, async () => {
+    const env = credentialEnv()
+    const io = buffers()
+    const reason = status === 429 ? "rate_limited" : "invalid_data"
+    try {
+      const calls = await withCrispMock({
+        status,
+        json: { error: true, reason, data: { message: "search failed" } },
+        headers: status === 429 ? { "retry-after": "3" } : {},
+      }, async (dispatcher) => {
+        const code = await run(["--json", "people", "get", "ada@example.com"], { ...io, env, dispatcher })
+        assert.equal(code, 1)
+        const body = JSON.parse(io.err()) as { status: number; reason: string }
+        assert.equal(body.status, status)
+        assert.equal(body.reason, reason)
+      })
+      assert.equal(calls.length, 1)
+      assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=ada@example.com`)
+    } finally {
+      removeHome(env)
+    }
+  })
+}
+
+test("people get email with no exact match does not fetch a profile", async () => {
+  const env = credentialEnv()
+  const io = buffers()
+  try {
+    const calls = await withCrispMock({
+      status: 200,
+      json: okEnvelope([{ people_id: "other", email: "someone@example.com" }]),
+    }, async (dispatcher) => {
+      const code = await run(["--json", "people", "get", "ada@example.com"], { ...io, env, dispatcher })
+      assert.equal(code, 1)
+      const body = JSON.parse(io.err()) as { status: number; reason: string }
+      assert.equal(body.status, 404)
+      assert.equal(body.reason, "not_found")
+    })
+    assert.equal(calls.length, 1)
+    assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=ada@example.com`)
+  } finally {
+    removeHome(env)
+  }
+})
 
 test("search segment query and people id are encoded on the path", async () => {
   const env = credentialEnv()

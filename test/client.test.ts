@@ -3,7 +3,7 @@ import { test } from "node:test"
 import { MockAgent } from "undici"
 import { CrispClient } from "../src/client.js"
 import { CrispApiError } from "../src/errors.js"
-import { FIXTURE, withCrispMock } from "./support.js"
+import { FIXTURE, okEnvelope, withCrispMock } from "./support.js"
 
 function client(dispatcher?: ConstructorParameters<typeof CrispClient>[1]): CrispClient {
   return new CrispClient(
@@ -62,6 +62,35 @@ test("non-JSON error body keeps the status", async () => {
         assert.equal(err.status, 502)
         assert.equal(err.reason, "http_error")
         assert.equal(err.message, "HTTP 502")
+        return true
+      },
+    )
+  })
+})
+
+test("JSON values that are not objects are invalid_json", async () => {
+  for (const body of ['"ok"', "[1]", "null", "1"]) {
+    await withCrispMock({ status: 200, json: body }, async (dispatcher) => {
+      await assert.rejects(
+        () => client(dispatcher).listOperators(),
+        (err: unknown) => {
+          assert.ok(err instanceof CrispApiError)
+          assert.equal(err.reason, "invalid_json")
+          assert.equal(err.message, "response was not a JSON object")
+          return true
+        },
+      )
+    })
+  }
+})
+
+test("people search that is not a list is invalid_json", async () => {
+  await withCrispMock({ status: 200, json: okEnvelope({ people_id: "x" }) }, async (dispatcher) => {
+    await assert.rejects(
+      () => client(dispatcher).getPerson("ada@example.com"),
+      (err: unknown) => {
+        assert.ok(err instanceof CrispApiError)
+        assert.equal(err.reason, "invalid_json")
         return true
       },
     )

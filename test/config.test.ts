@@ -185,8 +185,33 @@ test("unreadable config directory surfaces a config error without the key", () =
   }
 })
 
-test("redactSecrets replaces long secrets and keeps short strings", () => {
+test("redactSecrets replaces every non-empty secret", () => {
   assert.equal(redactSecrets("token fixture-token-key-do-not-log end", ["fixture-token-key-do-not-log"]), "token [redacted] end")
-  assert.equal(redactSecrets("abc abc", ["abc"]), "abc abc")
+  assert.equal(redactSecrets("abc abc", ["abc"]), "[redacted] [redacted]")
+  assert.equal(redactSecrets("ab", ["a", "ab"]), "[redacted]")
+  assert.equal(redactSecrets("a.b aXb", ["a.b"]), "[redacted] aXb")
   assert.equal(redactSecrets("plain", [undefined, ""]), "plain")
+})
+
+test("saveConfig does not chmod an existing parent of CRISPCTL_CONFIG", () => {
+  const root = mkdtempSync(join(tmpdir(), "crispctl-parent-"))
+  try {
+    const parent = join(root, "parent")
+    mkdirSync(parent)
+    chmodSync(parent, 0o755)
+    saveConfig({ CRISPCTL_CONFIG: join(parent, "explicit.json") }, { profiles: {} })
+    assert.equal(statSync(parent).mode & 0o777, 0o755)
+    assert.equal(statSync(join(parent, "explicit.json")).mode & 0o777, 0o600)
+
+    const kept = join(root, "kept")
+    mkdirSync(kept)
+    chmodSync(kept, 0o755)
+    saveConfig({ CRISPCTL_CONFIG: join(kept, "a", "b", "config.json") }, { profiles: {} })
+    assert.equal(statSync(kept).mode & 0o777, 0o755)
+    assert.equal(statSync(join(kept, "a")).mode & 0o777, 0o700)
+    assert.equal(statSync(join(kept, "a", "b")).mode & 0o777, 0o700)
+    assert.equal(statSync(join(kept, "a", "b", "config.json")).mode & 0o777, 0o600)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

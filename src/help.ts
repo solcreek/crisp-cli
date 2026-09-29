@@ -143,8 +143,10 @@ ${usage.peopleGet}
 `,
   "people get": `${usage.peopleGet}
 
-GET /v1/website/{website_id}/people/profile/{id}
-The path segment may be a people id or an email address.
+A people id calls GET /v1/website/{website_id}/people/profile/{people_id}.
+An email is not placed on that path. crispctl searches
+GET /v1/website/{website_id}/people/profiles/1?search_text=<email>
+and then fetches the people_id whose email matches exactly.
 `,
   operators: `crispctl operators list
 

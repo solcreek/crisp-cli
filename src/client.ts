@@ -87,8 +87,27 @@ export class CrispClient {
     })
   }
 
-  getPerson(idOrEmail: string): Promise<unknown> {
-    return this.request("GET", this.site(`/people/profile/${encodeURIComponent(idOrEmail)}`))
+  async getPerson(idOrEmail: string): Promise<unknown> {
+    const peopleId = isEmail(idOrEmail) ? await this.peopleIdForEmail(idOrEmail) : idOrEmail
+    return this.request("GET", this.site(`/people/profile/${encodeURIComponent(peopleId)}`))
+  }
+
+  private async peopleIdForEmail(email: string): Promise<string> {
+    const listed = await this.request("GET", this.site("/people/profiles/1"), {
+      query: { search_text: email },
+    })
+    if (!Array.isArray(listed)) {
+      throw new CrispApiError(200, "invalid_json", "people search did not return a list")
+    }
+    const needle = email.toLowerCase()
+    for (const item of listed) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue
+      const profile = item as { email?: unknown; people_id?: unknown }
+      if (typeof profile.email !== "string" || profile.email.toLowerCase() !== needle) continue
+      if (typeof profile.people_id !== "string" || profile.people_id.length === 0) continue
+      return profile.people_id
+    }
+    throw new CrispApiError(404, "not_found", "people profile not found")
   }
 
   listOperators(): Promise<unknown> {
@@ -138,14 +157,19 @@ export class CrispClient {
     const retryAfter = response.headers.get("retry-after") ?? undefined
     let payload: Envelope | null = null
     if (text.length > 0) {
+      let decoded: unknown
       try {
-        payload = JSON.parse(text) as Envelope
+        decoded = JSON.parse(text)
       } catch {
         if (response.status >= 400) {
           throw new CrispApiError(response.status, statusReason(response.status), `HTTP ${response.status}`, retryAfter)
         }
         throw new CrispApiError(response.status, "invalid_json", "response was not JSON", retryAfter)
       }
+      if (!isEnvelope(decoded)) {
+        throw new CrispApiError(response.status, "invalid_json", "response was not a JSON object", retryAfter)
+      }
+      payload = decoded
     }
 
     if (response.status >= 400 || payload?.error === true) {
@@ -161,6 +185,14 @@ export class CrispClient {
     }
     return null
   }
+}
+
+function isEnvelope(value: unknown): value is Envelope {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+$/.test(value)
 }
 
 function statusReason(status: number): string {

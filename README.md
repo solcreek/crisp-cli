@@ -88,7 +88,8 @@ crispctl listen
 | `assign <session> --unassign` | `PATCH .../routing` `{"assigned":null}` |
 | `segments <session> --set a,b` | `PATCH .../meta` `{"segments":["a","b"]}` |
 | `read <session>` | `PATCH .../read` `{"from":"operator","origin":"chat"}` |
-| `people get <id\|email>` | `GET /v1/website/{website_id}/people/profile/{id}` |
+| `people get <id>` | `GET /v1/website/{website_id}/people/profile/{people_id}` |
+| `people get <email>` | `GET .../people/profiles/1?search_text=<email>`, then `GET .../people/profile/{people_id}` for the exact email match |
 | `operators list` | `GET /v1/website/{website_id}/operators/list` |
 
 Requests send HTTP Basic auth (`identifier:key`) and `X-Crisp-Tier`. Stdout is the Crisp `data` payload.
@@ -132,7 +133,7 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 
 1. Set `version` in `package.json` (for example `0.1.0`).
 2. Tag that commit `vX.Y.Z`, matching the `version` field: `git tag v0.1.0 && git push origin v0.1.0`.
-3. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. It runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
+3. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
 
 Pull requests run `.github/workflows/ci.yml` (install, typecheck, test, no live call).
 
