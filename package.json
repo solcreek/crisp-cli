@@ -1,0 +1,14 @@
+{
+  "name": "crispctl",
+  "version": "0.0.0",
+  "description": "Placeholder — crispctl is under development.",
+  "license": "MIT",
+  "author": "linyiru",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solcreek/crisp-cli.git"
+  },
+  "homepage": "https://github.com/solcreek/crisp-cli#readme",
+  "bugs": "https://github.com/solcreek/crisp-cli/issues",
+  "files": ["README.md"]
+}
