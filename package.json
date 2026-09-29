@@ -1,14 +1,57 @@
 {
   "name": "crispctl",
-  "version": "0.0.0",
-  "description": "Placeholder — crispctl is under development.",
+  "version": "0.1.0",
+  "description": "Agent-friendly CLI for Crisp support operations",
   "license": "MIT",
   "author": "linyiru",
+  "type": "module",
+  "bin": {
+    "crispctl": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/solcreek/crisp-cli.git"
   },
   "homepage": "https://github.com/solcreek/crisp-cli#readme",
   "bugs": "https://github.com/solcreek/crisp-cli/issues",
-  "files": ["README.md"]
+  "keywords": [
+    "crisp",
+    "cli",
+    "support"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "c8 node --enable-source-maps --import tsx --test test/*.test.ts",
+    "test:live": "node --import tsx --test test/live/smoke.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "undici": "^6.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "c8": "^10.1.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "c8": {
+    "all": true,
+    "src": ["src"],
+    "include": ["src/**/*.ts"],
+    "reporter": ["text", "text-summary"],
+    "check-coverage": true,
+    "lines": 80,
+    "statements": 80,
+    "functions": 80,
+    "branches": 75
+  }
 }
