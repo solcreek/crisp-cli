@@ -22,8 +22,15 @@ childProcess.execFileSync = (command, args) => {
   )
   return JSON.stringify({
     fields: [
-      { label: "API Identifier", value: "fixture-id" },
-      { label: "API Key", value: "fixture-secret" },
+      {
+        label:
+          process.env.SMOKE_FIXTURE_CUSTOM_ITEM === "1" ? "token_identifier" : "API Identifier",
+        value: "fixture-id",
+      },
+      {
+        label: process.env.SMOKE_FIXTURE_CUSTOM_ITEM === "1" ? "token_key" : "API Key",
+        value: "fixture-secret",
+      },
       { label: "website_id", value: websiteId },
     ],
   })

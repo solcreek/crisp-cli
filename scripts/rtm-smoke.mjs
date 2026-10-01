@@ -31,8 +31,8 @@ const field = (label) =>
     ? item.fields.find((entry) => entry && entry.label === label && typeof entry.value === "string")
         ?.value
     : undefined
-const identifier = field("API Identifier")
-const key = field("API Key")
+const identifier = field("API Identifier") || field("token_identifier")
+const key = field("API Key") || field("token_key")
 const websiteId = field("website_id")
 if (!identifier || !key || !websiteId) throw new Error("1Password item is missing required fields")
 const response = await fetch(`https://api.crisp.chat/v1/website/${encodeURIComponent(websiteId)}`, {

@@ -108,6 +108,6 @@ test("credential lookup failures never print captured credential output", () => 
   assert.doesNotMatch(`${child.stdout}${child.stderr}`, /fixture-secret/)
 })
 
-test("smoke can select an explicit API-token item and vault", () => {
+test("smoke accepts token_identifier/token_key in an explicit API-token item and vault", () => {
   assert.equal(smoke(false, "auth", true, true).code, 0)
 })

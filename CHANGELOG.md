@@ -42,6 +42,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Accept `token_identifier` and `token_key` field names in 1Password API-token
+  items used by the opt-in RTM smoke check.
+
 - Bound and validate live-smoke NDJSON, terminate stalled child processes and
   emit assertion metadata only; type-check and enforce coverage on the monitor.
 
