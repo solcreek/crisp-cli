@@ -27,6 +27,13 @@ type Verb = {
 
 const verbs: Verb[] = [
   {
+    name: "conversations pages",
+    argv: ["conversations", "pages", session, "--page", "2"],
+    method: "GET",
+    path: `${site}/conversation/${session}/pages/2`,
+    body: null,
+  },
+  {
     name: "conversations list",
     argv: ["conversations", "list", "--page", "2"],
     method: "GET",

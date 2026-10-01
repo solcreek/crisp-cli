@@ -81,6 +81,7 @@ Global flags (any position): `--json`, `--read-only`, `--profile`, `--website`.
 ```text
 crispctl auth set|show
 crispctl conversations list|get|search
+crispctl conversations pages <session> [--page n]
 crispctl messages list <session>
 crispctl reply <session> --text "..." | --note "..."
 crispctl resolve|reopen <session>
@@ -92,25 +93,49 @@ crispctl operators list
 crispctl listen
 ```
 
-| Command                         | HTTP                                                                                                                 |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `conversations list [--page n]` | `GET /v1/website/{website_id}/conversations/{page}`                                                                  |
-| `conversations get <session>`   | `GET /v1/website/{website_id}/conversation/{session}`                                                                |
-| `conversations search <query>`  | `GET /v1/website/{website_id}/conversations/{page}?search_query&search_type` (`text` or `segment`)                   |
-| `messages list <session>`       | `GET /v1/website/{website_id}/conversation/{session}/messages`                                                       |
-| `reply <session> --text`        | `POST .../message` `{"type":"text","from":"operator","origin":"chat","content":"..."}`                               |
-| `reply <session> --note`        | `POST .../message` `{"type":"note","from":"operator","origin":"chat","content":"..."}`                               |
-| `resolve <session>`             | `PATCH .../state` `{"state":"resolved"}`                                                                             |
-| `reopen <session>`              | `PATCH .../state` `{"state":"unresolved"}`                                                                           |
-| `assign <session> --user <id>`  | `PATCH .../routing` `{"assigned":{"user_id":"<id>"}}`                                                                |
-| `assign <session> --unassign`   | `PATCH .../routing` `{"assigned":null}`                                                                              |
-| `segments <session> --set a,b`  | `PATCH .../meta` `{"segments":["a","b"]}`                                                                            |
-| `read <session>`                | `PATCH .../read` `{"from":"operator","origin":"chat"}`                                                               |
-| `people get <id>`               | `GET /v1/website/{website_id}/people/profile/{people_id}`                                                            |
-| `people get <email>`            | `GET .../people/profiles/1?search_text=<email>`, then `GET .../people/profile/{people_id}` for the exact email match |
-| `operators list`                | `GET /v1/website/{website_id}/operators/list`                                                                        |
+| Command                                    | HTTP                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `conversations list [--page n]`            | `GET /v1/website/{website_id}/conversations/{page}`                                                                  |
+| `conversations get <session>`              | `GET /v1/website/{website_id}/conversation/{session}`                                                                |
+| `conversations pages <session> [--page n]` | `GET /v1/website/{website_id}/conversation/{session}/pages/{page}`                                                   |
+| `conversations search <query>`             | `GET /v1/website/{website_id}/conversations/{page}?search_query&search_type` (`text` or `segment`)                   |
+| `messages list <session>`                  | `GET /v1/website/{website_id}/conversation/{session}/messages`                                                       |
+| `reply <session> --text`                   | `POST .../message` `{"type":"text","from":"operator","origin":"chat","content":"..."}`                               |
+| `reply <session> --note`                   | `POST .../message` `{"type":"note","from":"operator","origin":"chat","content":"..."}`                               |
+| `resolve <session>`                        | `PATCH .../state` `{"state":"resolved"}`                                                                             |
+| `reopen <session>`                         | `PATCH .../state` `{"state":"unresolved"}`                                                                           |
+| `assign <session> --user <id>`             | `PATCH .../routing` `{"assigned":{"user_id":"<id>"}}`                                                                |
+| `assign <session> --unassign`              | `PATCH .../routing` `{"assigned":null}`                                                                              |
+| `segments <session> --set a,b`             | `PATCH .../meta` `{"segments":["a","b"]}`                                                                            |
+| `read <session>`                           | `PATCH .../read` `{"from":"operator","origin":"chat"}`                                                               |
+| `people get <id>`                          | `GET /v1/website/{website_id}/people/profile/{people_id}`                                                            |
+| `people get <email>`                       | `GET .../people/profiles/1?search_text=<email>`, then `GET .../people/profile/{people_id}` for the exact email match |
+| `operators list`                           | `GET /v1/website/{website_id}/operators/list`                                                                        |
 
 Requests send HTTP Basic auth (`identifier:key`) and `X-Crisp-Tier`. Stdout is the Crisp `data` payload.
+
+### Browsing history
+
+```bash
+crispctl conversations pages session_... --json --read-only
+crispctl conversations pages session_... --page 2 --json --read-only
+crispctl listen --events session:sync:pages --session session_... --json --read-only
+```
+
+`conversations pages` returns one page of browsing history recorded by Crisp for
+the selected conversation/session. `--page` defaults to 1 and accepts positive
+safe integers. JSON output is the returned array, including `page_title`,
+`page_url`, `page_referrer` when available, and `timestamp`; an empty page is `[]`.
+No additional pages are fetched automatically. This is session history, not the
+visitor's complete browser history or history across all their conversations.
+See [List Conversation Pages](https://docs.crisp.chat/references/rest-api/v1/#list-conversation-pages).
+
+For ongoing visits, explicitly select
+[`session:sync:pages`](https://docs.crisp.chat/references/rtm-api/v1/#session-sync-pages)
+with `listen`; it is not in the default event set. Both APIs require
+`website:conversation:pages` read access. REST supplies recorded history and RTM
+supplies new events; the commands do not merge or deduplicate them. RTM does not
+replay events missed while disconnected, so refresh history through REST when needed.
 
 ### Read-only mode
 
@@ -244,9 +269,10 @@ catalogs, invalid exit codes, credential isolation and temporary-directory clean
 
 ### Live smoke
 
-`npm run test:live` builds the CLI and runs the opt-in live suite. Both checks **skip** by default (exit 0):
+`npm run test:live` builds the CLI and runs the opt-in live suite. All checks **skip** by default (exit 0):
 
 - REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials for a dedicated test website.
+- Browsing history additionally requires `CRISPCTL_LIVE_PAGES_SESSION` set to a session on that test website. It reads page 1 with a read-only client and validates the returned fields; an empty history passes but does not establish that page visits were recorded.
 - RTM requires `CRISPCTL_LIVE_RTM=1`, an expected website name, and an authenticated `op` CLI. It reads `Crisp API Credentials` and requires receipt of an actual event within 60 seconds, not merely a successful handshake. It never sends messages or writes data.
 
 RTM defaults to `CRISPCTL_LIVE_RTM_MODE=event`. For a quiet website, set

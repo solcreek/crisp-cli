@@ -42,6 +42,13 @@ export class CrispClient {
     return this.request("GET", this.site(`/conversation/${encodeURIComponent(sessionId)}`))
   }
 
+  listConversationPages(sessionId: string, page = 1): Promise<unknown> {
+    return this.request(
+      "GET",
+      this.site(`/conversation/${encodeURIComponent(sessionId)}/pages/${page}`),
+    )
+  }
+
   searchConversations(searchQuery: string, page = 1, searchType = "text"): Promise<unknown> {
     return this.request("GET", this.site(`/conversations/${page}`), {
       query: {

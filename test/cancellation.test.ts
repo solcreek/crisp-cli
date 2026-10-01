@@ -18,6 +18,7 @@ import {
 const commands = [
   ["conversations", "list"],
   ["conversations", "get", FIXTURE.session],
+  ["conversations", "pages", FIXTURE.session],
   ["conversations", "search", "hello"],
   ["messages", "list", FIXTURE.session],
   ["reply", FIXTURE.session, "--text", "hello"],

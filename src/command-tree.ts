@@ -38,6 +38,12 @@ const DEFINITIONS: Readonly<Record<CommandPath, CommandDefinition>> = {
     options: ["page", "search-type"],
     run: operations.conversationsSearch,
   },
+  "conversations pages": {
+    description: "List browsed pages in a session",
+    argument: "<session>",
+    options: ["page"],
+    run: operations.conversationsPages,
+  },
   "messages list": {
     description: "List messages in a session",
     argument: "<session>",

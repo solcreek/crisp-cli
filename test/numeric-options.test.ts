@@ -34,6 +34,7 @@ test("pages accept only positive safe integers without rounding or overflow", ()
 for (const [argv, flag] of [
   [["conversations", "list"], "page"],
   [["conversations", "search", "hello"], "page"],
+  [["conversations", "pages", "session_test"], "page"],
   [["listen"], "count"],
   [["listen"], "timeout"],
 ] as const) {
@@ -98,6 +99,7 @@ for (const state of ["missing", "invalid"]) {
       for (const argv of [
         ["conversations", "list", "--page=0"],
         ["conversations", "search", "hello", "--page=9007199254740993"],
+        ["conversations", "pages", "session_test", "--page=0"],
         ["listen", "--count=0"],
         ["listen", "--timeout=0"],
       ]) {
