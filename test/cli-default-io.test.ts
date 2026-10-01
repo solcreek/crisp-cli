@@ -9,10 +9,12 @@ test("run defaults write successful output to stdout and usage errors to stderr"
     const child = spawnSync(
       process.execPath,
       [
+        "--import",
+        "tsx",
         "--input-type=module",
         "-e",
         `
-      import { run } from './dist/cli.js'
+      import { run } from './src/cli.ts'
       const success = await run(['--version'])
       const failure = await run(['unknown', '--json'])
       process.exitCode = success === 0 && failure === 2 ? 0 : 1

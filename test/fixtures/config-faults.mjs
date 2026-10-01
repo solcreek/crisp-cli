@@ -4,7 +4,7 @@ import fs from "node:fs"
 import { syncBuiltinESMExports } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { loadConfig, saveConfig } from "../../dist/config.js"
+import { loadConfig, saveConfig } from "../../src/config.ts"
 
 const directory = fs.mkdtempSync(join(tmpdir(), "crispctl-config-fault-"))
 const path = join(directory, "config.json")
