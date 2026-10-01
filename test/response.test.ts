@@ -129,7 +129,11 @@ for (const compressed of [false, true]) {
         return agent.dispatch({ ...options, origin }, handler)
       }
     }
-    const watchdog = setTimeout(() => server.closeAllConnections(), 5000)
+    let watchdogFired = false
+    const watchdog = setTimeout(() => {
+      watchdogFired = true
+      server.closeAllConnections()
+    }, 5000)
     try {
       const client = new CrispClient(
         { ...FIXTURE, tier: "website" },
@@ -138,6 +142,7 @@ for (const compressed of [false, true]) {
       )
       await assert.rejects(client.listOperators(), { status: 200, reason: "response_too_large" })
       await closed!
+      assert.equal(watchdogFired, false, "size limit must close transport before the watchdog")
     } finally {
       clearTimeout(watchdog)
       server.closeAllConnections()
