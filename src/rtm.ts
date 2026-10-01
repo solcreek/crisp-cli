@@ -1,8 +1,8 @@
 import { io, type Socket } from "socket.io-client"
-import { setTimeout as delay } from "node:timers/promises"
 import type { CrispClient, ClientCredentials } from "./client.js"
 import { CrispApiError, UsageError } from "./errors.js"
 import { assertEventTiers } from "./rtm-events.js"
+import { retryDelay, waitForRetry, type RetryRuntime } from "./rtm-retry.js"
 
 export const DEFAULT_EVENTS = ["message:send", "message:received", "session:set_state"]
 
@@ -19,6 +19,7 @@ export type ListenOptions = {
   socketFactory?: SocketFactory
   reconnectDelayMs?: number
   connectionTimeoutMs?: number
+  retry?: Partial<RetryRuntime>
 }
 
 export function parseEvents(raw?: string): string[] {
@@ -63,6 +64,7 @@ export async function listen(
   let received = 0
   let failures = 0
   while (!options.signal.aborted) {
+    let retryAfter: string | undefined
     try {
       const endpoint = socketEndpoint(await client.getConnectEndpoints(options.signal))
       if (options.signal.aborted) break
@@ -77,14 +79,16 @@ export async function listen(
       if (options.signal.aborted) break
       if (!(error instanceof CrispApiError) ||
           ![0, 429, 500, 502, 503, 504].includes(error.status)) throw error
+      retryAfter = error.retryAfter
     }
     if (options.signal.aborted) break
     options.onStatus({ status: "reconnecting", website_id: creds.websiteId })
-    const backoff = Math.min((options.reconnectDelayMs ?? 1000) * 2 ** Math.min(failures++, 5), 30_000)
+    const backoff = retryDelay(failures++, options.reconnectDelayMs ?? 1000,
+      (options.retry?.random ?? Math.random)(), (options.retry?.now ?? Date.now)(), retryAfter)
     try {
-      await delay(backoff, undefined, { signal: options.signal })
-    } catch {
-      // Cancellation ends the loop and tears down the current connection.
+      await (options.retry?.sleep ?? waitForRetry)(backoff, options.signal)
+    } catch (error) {
+      if (!options.signal.aborted) throw error
     }
   }
 }

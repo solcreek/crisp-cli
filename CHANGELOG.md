@@ -9,6 +9,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Honor discovery `Retry-After` headers, add jitter to reconnect delays, and keep
+  long retry waits cancellable without overflowing Node timers.
 - Normalize network failures while reading HTTP response bodies so RTM endpoint
   discovery reconnects after a partial-response disconnect.
 - Handle closed stdout pipes without an uncaught EPIPE, drain queued output before

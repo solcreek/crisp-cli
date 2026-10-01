@@ -401,3 +401,53 @@ test("abort during response-body consumption stops without retry or socket creat
   }))
   assert.equal(dispatcher.attempts, 1)
 })
+
+test("rate-limited discovery honors Retry-After before connecting again", async () => {
+  let attempts = 0
+  const delays: number[] = []
+  const h = harness((_payload, socket) => { socket.receive("authenticated"); socket.receive("message:send", { website_id: creds.websiteId }) })
+  await listen({ getConnectEndpoints: async () => {
+    if (++attempts === 1) throw new CrispApiError(429, "rate_limited", "wait", "1")
+    return endpoint
+  } }, creds, options(h.factory, { count: 1, retry: { sleep: async ms => { delays.push(ms) } } }))
+  assert.deepEqual(delays, [1000])
+})
+
+test("retry backoff resets after authenticated disconnect and injected sleep errors propagate", async () => {
+  let attempts = 0
+  const delays: number[] = []
+  const h = harness((_payload, socket) => {
+    socket.receive("authenticated")
+    if (attempts === 3) socket.receive("disconnect")
+    else socket.receive("message:send", { website_id: creds.websiteId })
+  })
+  await listen({ getConnectEndpoints: async () => {
+    attempts++
+    if ([1, 2, 4].includes(attempts)) throw new CrispApiError(503, "temporary", "temporary")
+    return endpoint
+  } }, creds, options(h.factory, { count: 1, reconnectDelayMs: 1000,
+    retry: { random: () => 1, now: () => 0, sleep: async ms => { delays.push(ms) } },
+  }))
+  assert.deepEqual(delays, [1000, 2000, 1000, 2000])
+  await assert.rejects(listen({ getConnectEndpoints: async () => { throw new CrispApiError(503, "temporary", "temporary") } },
+    creds, options(h.factory, { retry: { sleep: async () => { throw new Error("clock failure") } } })), /clock failure/)
+})
+
+test("100 reconnects leave no socket listeners or abort listeners behind", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] })
+  const controller = new AbortController()
+  let connections = 0
+  let discoveries = 0
+  const h = harness((_payload, socket) => {
+    socket.receive("authenticated")
+    if (++connections <= 100) socket.receive("disconnect")
+    else socket.receive("message:send", { website_id: creds.websiteId })
+  })
+  await listen({ getConnectEndpoints: async () => { discoveries++; return endpoint } }, creds,
+    options(h.factory, { count: 1, signal: controller.signal, retry: { sleep: async () => {} } }))
+  assert.equal(discoveries, 101)
+  assert.ok(h.sockets.every(socket => socket.closed && socket.eventNames().length === 0))
+  assert.equal(EventEmitter.getEventListeners(controller.signal, "abort").length, 0)
+  t.mock.timers.tick(60_000)
+  assert.equal(discoveries, 101)
+})
