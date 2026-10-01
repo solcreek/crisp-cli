@@ -23,6 +23,7 @@ childProcess.spawn = (_command, args, options) => {
   assert.ok(args.includes("--read-only"))
   assert.equal(options.env.CRISPCTL_READ_ONLY, "1")
   const child = new EventEmitter()
+  child.kill = signal => { assert.equal(signal, "SIGTERM"); return true }
   child.stdout = new PassThrough()
   child.stderr = new PassThrough()
   setImmediate(() => {
@@ -39,7 +40,7 @@ childProcess.spawn = (_command, args, options) => {
         child.stdout.write(line.slice(0, 20))
         child.stdout.write(`${line.slice(20)}\n`)
       }
-      child.stderr.end(`${JSON.stringify({ status: "authenticated" })}\n`)
+      child.stderr.end(`${JSON.stringify(process.env.SMOKE_FIXTURE_AUTH === "0" ? { error: "unauthorized" } : { status: "authenticated" })}\n`)
       child.stdout.end()
       await drained
       child.emit("close", 0)

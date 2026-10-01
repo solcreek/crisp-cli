@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Optional `CRISPCTL_LIVE_RTM_MODE=auth` smoke verification for quiet websites;
+  event-delivery verification remains the default and reports its mode explicitly.
+
 ### Changed
 
 - Extend WSS E2E coverage with independent representative payload fixtures and

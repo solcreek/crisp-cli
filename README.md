@@ -179,6 +179,13 @@ Aggregate coverage is enforced across all `src/` files, including unimported fil
 - REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials (Cos Sandbox only).
 - RTM requires `CRISPCTL_LIVE_RTM=1`, an expected website name, and an authenticated `op` CLI. It reads `Crisp API Credentials` and requires receipt of an actual event within 60 seconds, not merely a successful handshake. It never sends messages or writes data.
 
+RTM defaults to `CRISPCTL_LIVE_RTM_MODE=event`. For a quiet website, set
+`CRISPCTL_LIVE_RTM_MODE=auth` to verify authentication and then disconnect without
+waiting for traffic. The result identifies the mode and event count; an auth-only
+pass does not establish event delivery. In event mode, no events within the
+deadline still fails. The outer watchdog allows time for 1Password authorization,
+website identity verification and the full event deadline.
+
 ```bash
 CRISPCTL_LIVE_RTM=1 CRISPCTL_LIVE_WEBSITE_NAME="<expected website name>" npm run test:live
 ```

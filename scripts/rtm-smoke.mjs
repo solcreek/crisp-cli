@@ -3,8 +3,9 @@ import { execFileSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 const expectedName = process.argv[2]
-if (!expectedName) throw new Error("Usage: node scripts/rtm-smoke.mjs <expected-website-name>")
-const item = JSON.parse(execFileSync("op", ["item", "get", "Crisp API Credentials", "--format", "json"], { encoding: "utf8" }))
+const mode = process.argv[3] ?? "event"
+if (!expectedName || !["auth", "event"].includes(mode)) throw new Error("Usage: node scripts/rtm-smoke.mjs <expected-website-name> [auth|event]")
+const item = JSON.parse(execFileSync("op", ["item", "get", "Crisp API Credentials", "--format", "json"], { encoding: "utf8", timeout: 60_000 }))
 const field = label => item.fields.find(field => field.label === label)?.value
 const identifier = field("API Identifier")
 const key = field("API Key")
@@ -22,6 +23,10 @@ const child = spawn(process.execPath, [fileURLToPath(new URL("../dist/index.js",
   stdio: ["ignore", "pipe", "pipe"],
 })
 let received = 0
+let authenticated = false
+const stop = () => child.kill("SIGTERM")
+process.once("SIGTERM", stop)
+process.once("SIGINT", stop)
 function lines(stream, handle) {
   let pending = ""
   stream.setEncoding("utf8")
@@ -39,10 +44,16 @@ lines(child.stdout, event => {
 })
 lines(child.stderr, status => {
   console.log(JSON.stringify({ check: "status", status: status.status, error: status.error }))
+  if (status.status === "authenticated") {
+    authenticated = true
+    if (mode === "auth") stop()
+  }
 })
 child.on("error", () => { console.error("Could not start CLI"); process.exitCode = 1 })
 // Wait for stdout/stderr to drain before counting the final event.
 child.on("close", code => {
-  console.log(JSON.stringify({ check: "result", exit_code: code, received_events: received }))
-  process.exitCode = code === 0 && received > 0 ? 0 : 1
+  process.removeListener("SIGTERM", stop)
+  process.removeListener("SIGINT", stop)
+  console.log(JSON.stringify({ check: "result", mode, authenticated, exit_code: code, received_events: received }))
+  process.exitCode = code === 0 && authenticated && (mode === "auth" || received > 0) ? 0 : 1
 })
