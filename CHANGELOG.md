@@ -15,6 +15,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Construct only the options declared by each command, preserving fresh command
+  trees and the existing help and parsing contracts.
+
 - Load command operations and network transports only when needed, reducing
   help, configuration and validation startup costs while preserving cancellation
   across asynchronous module loading.

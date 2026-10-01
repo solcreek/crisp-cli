@@ -114,6 +114,7 @@ export function createCommandTree() {
       .configureOutput({ writeOut: () => {}, writeErr: () => {} })
   const root = create("crispctl").description("Agent-friendly Crisp REST and RTM CLI")
   const optionDefinitions = OPTIONS.map(([flags, description]) => new Option(flags, description))
+  const optionsByName = new Map(optionDefinitions.map((option) => [option.name(), option]))
   for (const option of optionDefinitions)
     root.addOption(option.hideHelp(!GLOBAL_FLAGS.has(option.name())))
   const leaves: Command[] = []
@@ -139,9 +140,9 @@ export function createCommandTree() {
     }
     const command = create(path.at(-1)!).description(definition.description)
     if (definition.argument) command.argument(definition.argument)
-    for (const [flags, description] of OPTIONS) {
-      const option = new Option(flags, description)
-      if (definition.options?.some((name) => name === option.name())) command.addOption(option)
+    for (const name of definition.options ?? []) {
+      const option = optionsByName.get(name)!
+      command.addOption(new Option(option.flags, option.description))
     }
     command.addHelpText("after", `\n${COMMAND_NOTES[commandPath]}`)
     command.action(async () => {
