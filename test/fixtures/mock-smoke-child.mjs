@@ -7,6 +7,9 @@ import { PassThrough } from "node:stream"
 
 const websiteId = "smoke-fixture-website"
 childProcess.execFileSync = (command, args) => {
+  if (process.env.SMOKE_FIXTURE_OP_FAILURE === "1") {
+    throw Object.assign(new Error("fixture-secret in error"), { stdout: "fixture-secret in partial stdout", stderr: "fixture-secret in stderr" })
+  }
   assert.equal(command, "op")
   assert.deepEqual(args, ["item", "get", "Crisp API Credentials", "--format", "json"])
   return JSON.stringify({ fields: [

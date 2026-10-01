@@ -5,7 +5,15 @@ import { fileURLToPath } from "node:url"
 const expectedName = process.argv[2]
 const mode = process.argv[3] ?? "event"
 if (!expectedName || !["auth", "event"].includes(mode)) throw new Error("Usage: node scripts/rtm-smoke.mjs <expected-website-name> [auth|event]")
-const item = JSON.parse(execFileSync("op", ["item", "get", "Crisp API Credentials", "--format", "json"], { encoding: "utf8", timeout: 60_000 }))
+let item
+try {
+  item = JSON.parse(execFileSync("op", ["item", "get", "Crisp API Credentials", "--format", "json"], {
+    encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"],
+  }))
+} catch {
+  // execFileSync errors can contain partial credential stdout/stderr.
+  throw new Error("1Password credential lookup failed or timed out")
+}
 const field = label => item.fields.find(field => field.label === label)?.value
 const identifier = field("API Identifier")
 const key = field("API Key")

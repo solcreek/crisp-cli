@@ -44,3 +44,13 @@ test("neither smoke mode accepts an unauthenticated connection", () => {
     assert.equal(checks.at(-1).authenticated, false)
   }
 })
+
+test("credential lookup failures never print captured credential output", () => {
+  const child = spawnSync(process.execPath, [
+    "--import", fileURLToPath(new URL("./fixtures/mock-smoke-child.mjs", import.meta.url)),
+    fileURLToPath(new URL("../scripts/rtm-smoke.mjs", import.meta.url)), "Smoke fixture",
+  ], { encoding: "utf8", timeout: 5000, env: { ...process.env, SMOKE_FIXTURE_OP_FAILURE: "1" } })
+  assert.equal(child.status, 1)
+  assert.match(child.stderr, /1Password credential lookup failed or timed out/)
+  assert.doesNotMatch(`${child.stdout}${child.stderr}`, /fixture-secret/)
+})
