@@ -202,6 +202,9 @@ history when reviewing code ownership.
 `npm test` builds the CLI and runs all offline tests with coverage. CI tests the Node.js 22.12.0 minimum, current Node 22, and Node 24. No Crisp credentials or external services are needed.
 
 Commander defines the command tree and generates help in `src/command-tree.ts`.
+Option names derive from `src/command-options.ts`; the command map must cover
+every help-notes entry. Compile-time checks reject unknown names, and runtime
+tests exercise both help forms for every command.
 `src/cli.ts` adapts parsing and errors to the CLI's JSON and exit-code contract;
 `src/operations.ts` performs command operations through injected IO and enforces
 read-only mode before writes. REST, RTM, output and lifecycle code remain separate
@@ -215,8 +218,8 @@ prevents subsequent requests; a write already sent to Crisp may have taken effec
 `npm run verify` runs formatting, lint and typecheck, then builds once and runs
 the complete offline suite once. It reuses that run’s V8 coverage data for
 `coverage:rtm` and `coverage:tooling`, then smoke-tests the same built package.
-`test:rtm`, `test:tooling` and `test:package` remain standalone commands. The package smoke installs an actual tarball into a temporary
-directory and checks its executable, version, help, event catalog and error exit.
+`test:rtm`, `test:tooling` and `test:package` remain standalone commands.
+The package smoke installs an actual tarball into a temporary directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 | Layer                     | What it verifies                                                                                                                                                                        | Included in CI   |

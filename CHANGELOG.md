@@ -17,6 +17,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Type-check command names, option names and help-note completeness from shared
+  metadata, with help verification for every command.
 - Build and run the full offline suite once per verification, reusing coverage
   data for RTM and release-tooling gates and the build for package smoke tests.
 - Verify the minimum supported Node.js 22.12.0 in CI alongside current Node 22 and 24.

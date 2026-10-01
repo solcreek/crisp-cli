@@ -1,3 +1,4 @@
+import type { OptionName } from "./command-options.js"
 import { UsageError } from "./errors.js"
 
 export type Flags = {
@@ -30,7 +31,7 @@ export function websiteOverride(flags: Flags): string | undefined {
   return value ? value : undefined
 }
 
-export const GLOBAL_FLAGS = new Set([
+export const GLOBAL_FLAGS = new Set<string>([
   "json",
   "help",
   "version",
@@ -38,9 +39,9 @@ export const GLOBAL_FLAGS = new Set([
   "website",
   "website-id",
   "read-only",
-])
+] satisfies readonly OptionName[])
 
-export function assertAllowedFlags(seen: Set<string>, allowed: readonly string[]): void {
+export function assertAllowedFlags(seen: Set<string>, allowed: readonly OptionName[]): void {
   const ok = new Set<string>([...GLOBAL_FLAGS, ...allowed])
   for (const name of seen) {
     if (!ok.has(name)) {

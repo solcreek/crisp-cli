@@ -34,7 +34,7 @@ The token key is never printed. A config file written by crispctl is mode 0600.
 Development: use a dedicated test website. Production access requires explicit authorization and --read-only.
 `
 
-export const COMMAND_NOTES: Record<string, string> = {
+export const COMMAND_NOTES = {
   "auth set": `Writes the selected profile and makes it current. Flags win, then CRISPCTL_* / CRISP_* env, then the existing profile.
 --website and --website-id both set website_id. Tier is website or plugin.
 `,
@@ -91,3 +91,5 @@ Only the selected website is subscribed. Events missed while disconnected are no
 listen itself is always read-only.
 `,
 }
+
+export type CommandPath = keyof typeof COMMAND_NOTES

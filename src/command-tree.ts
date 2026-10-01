@@ -2,131 +2,92 @@ import { Command, CommanderError, Help, Option } from "commander"
 import { assertAllowedFlags, GLOBAL_FLAGS, type Flags } from "./args.js"
 import type { IO } from "./context.js"
 import { UsageError } from "./errors.js"
-import { COMMAND_NOTES, ROOT_NOTES } from "./help.js"
+import { COMMAND_NOTES, ROOT_NOTES, type CommandPath } from "./help.js"
+import { OPTIONS, type OptionName } from "./command-options.js"
 import * as operations from "./operations.js"
 
-const OPTIONS = [
-  ["--json", "Write machine-readable JSON"],
-  ["-h, --help", "Show help"],
-  ["--version", "Show version"],
-  ["--read-only", "Refuse all write operations"],
-  ["--profile <name>", "Select a credential profile"],
-  ["--website <id>", "Override website ID"],
-  ["--website-id <id>", "Alias for --website"],
-  ["--identifier <id>", "API identifier"],
-  ["--key <key>", "API token key"],
-  ["--tier <tier>", "Token tier: website or plugin"],
-  ["--page <n>", "Page number (default: 1)"],
-  ["--search-type <type>", "Search type: text or segment"],
-  ["--text <message>", "Send an operator message"],
-  ["--note <note>", "Send a private note"],
-  ["--user <id>", "Operator ID"],
-  ["--unassign", "Remove the assigned operator"],
-  ["--set <a,b>", "Replace segments (empty value clears them)"],
-  ["--events <a,b>", "RTM event names"],
-  ["--session <id>", "Filter RTM events by session"],
-  ["--count <n>", "Stop after N matching events"],
-  ["--timeout <seconds>", "Listen deadline including stdout drain"],
-  ["--list-events", "List RTM events without connecting"],
-] as const
-
-type Definition = {
-  path: string
+export type CommandDefinition = {
   description: string
   argument?: string
-  options?: readonly string[]
+  options?: readonly OptionName[]
   run: (io: IO, argument?: string) => number | Promise<number>
 }
-const DEFINITIONS: readonly Definition[] = [
-  {
-    path: "auth set",
+const DEFINITIONS: Readonly<Record<CommandPath, CommandDefinition>> = {
+  "auth set": {
     description: "Save a credential profile",
     options: ["identifier", "key", "tier"],
     run: operations.authSet,
   },
-  {
-    path: "auth show",
+  "auth show": {
     description: "Show the profile with the key redacted",
     run: operations.authShow,
   },
-  {
-    path: "conversations list",
+  "conversations list": {
     description: "List conversations",
     options: ["page"],
     run: operations.conversationsList,
   },
-  {
-    path: "conversations get",
+  "conversations get": {
     description: "Get one conversation",
     argument: "<session>",
     run: operations.conversationsGet,
   },
-  {
-    path: "conversations search",
+  "conversations search": {
     description: "Search conversations",
     argument: "<query>",
     options: ["page", "search-type"],
     run: operations.conversationsSearch,
   },
-  {
-    path: "messages list",
+  "messages list": {
     description: "List messages in a session",
     argument: "<session>",
     run: operations.messagesList,
   },
-  {
-    path: "reply",
+  reply: {
     description: "Send an operator message or private note",
     argument: "<session>",
     options: ["text", "note"],
     run: operations.replyCommand,
   },
-  {
-    path: "resolve",
+  resolve: {
     description: "Set conversation state to resolved",
     argument: "<session>",
     run: operations.resolveCommand,
   },
-  {
-    path: "reopen",
+  reopen: {
     description: "Set conversation state to unresolved",
     argument: "<session>",
     run: operations.reopenCommand,
   },
-  {
-    path: "assign",
+  assign: {
     description: "Assign or unassign an operator",
     argument: "<session>",
     options: ["user", "unassign"],
     run: operations.assignCommand,
   },
-  {
-    path: "segments",
+  segments: {
     description: "Replace conversation segments",
     argument: "<session>",
     options: ["set"],
     run: operations.segmentsCommand,
   },
-  {
-    path: "read",
+  read: {
     description: "Mark the conversation read",
     argument: "<session>",
     run: operations.readCommand,
   },
-  {
-    path: "people get",
+  "people get": {
     description: "Get a people profile by ID or email",
     argument: "<id|email>",
     run: operations.peopleGet,
   },
-  { path: "operators list", description: "List website operators", run: operations.operatorsList },
-  {
-    path: "listen",
+  "operators list": { description: "List website operators", run: operations.operatorsList },
+  listen: {
     description: "Stream RTM events with automatic reconnection",
     options: ["events", "session", "count", "timeout", "list-events"],
     run: operations.listenCommand,
   },
-]
+}
 
 // A fresh tree per invocation: no global program, process exit, or direct diagnostics.
 export function createCommandTree() {
@@ -147,8 +108,9 @@ export function createCommandTree() {
   let io: IO
   let result = 0
   let seen = new Set<string>()
-  for (const definition of DEFINITIONS) {
-    const path = definition.path.split(" ")
+  for (const commandPath of Object.keys(DEFINITIONS) as CommandPath[]) {
+    const definition = DEFINITIONS[commandPath]
+    const path = commandPath.split(" ")
     let parent = root
     for (const name of path.slice(0, -1)) {
       let group = parent.commands.find((command) => command.name() === name)
@@ -167,9 +129,9 @@ export function createCommandTree() {
     if (definition.argument) command.argument(definition.argument)
     for (const [flags, description] of OPTIONS) {
       const option = new Option(flags, description)
-      if (definition.options?.includes(option.name())) command.addOption(option)
+      if (definition.options?.some((name) => name === option.name())) command.addOption(option)
     }
-    command.addHelpText("after", `\n${COMMAND_NOTES[definition.path]!}`)
+    command.addHelpText("after", `\n${COMMAND_NOTES[commandPath]}`)
     command.action(async () => {
       assertAllowedFlags(seen, definition.options ?? [])
       result = await definition.run(io, command.args[0])
