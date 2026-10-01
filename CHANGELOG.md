@@ -13,6 +13,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   CI and the release gate, with pinned development dependencies and a separate
   formatting baseline recorded for Git blame.
 
+### Fixed
+
+- Propagate cancellation through REST requests and response bodies, prevent
+  cancelled writes and follow-up requests, and handle process signals while REST
+  commands are running.
+
 ## [0.4.0] - 2026-10-01
 
 ### Changed

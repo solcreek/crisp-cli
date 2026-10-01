@@ -248,6 +248,7 @@ function clientFrom(io: IO): CrispClient {
     },
     io.dispatcher,
     isReadOnly(io),
+    io.signal,
   )
 }
 
@@ -261,4 +262,5 @@ function firstSet(env: NodeJS.ProcessEnv, keys: readonly string[]): string | und
 
 function assertWritable(io: IO): void {
   if (isReadOnly(io)) throw new UsageError("read-only mode: write operations are disabled")
+  io.signal?.throwIfAborted()
 }

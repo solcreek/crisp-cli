@@ -16,6 +16,7 @@ export async function runProcess(
   const out = new OutputSink(stdout, lifecycle.cancel, "stdout")
   const err = new OutputSink(stderr, lifecycle.cancel, "stderr")
   try {
+    lifecycle.handleSignals()
     let code = await run(argv, {
       ...options,
       stdout: out.write,
@@ -24,7 +25,6 @@ export async function runProcess(
       signal: lifecycle.signal,
     })
     const deadlineReported = lifecycle.timedOut
-    lifecycle.handleSignals()
     try {
       await out.flush(lifecycle.signal, options.drainTimeoutMs)
     } catch (error) {
