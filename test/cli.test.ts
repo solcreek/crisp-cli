@@ -34,8 +34,8 @@ test("root help lists every MVP command", async () => {
   for (const command of COMMANDS) {
     assert.equal(io.out().includes(command), true, command)
   }
-  assert.match(io.out(), /Cos Crisp sandbox/)
-  assert.match(io.out(), /Teachify/)
+  assert.match(io.out(), /dedicated test website/)
+  assert.match(io.out(), /Production access requires explicit authorization and --read-only/)
 })
 
 test("subcommand help exits 0", async () => {

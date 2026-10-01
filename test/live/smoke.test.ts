@@ -7,7 +7,7 @@ const enabled = process.env.CRISPCTL_LIVE === "1" || process.env.CRISP_LIVE === 
 
 test(
   "live smoke lists operators",
-  { skip: enabled ? false : "set CRISPCTL_LIVE=1 or CRISP_LIVE=1 (Cos Sandbox only, never production Teachify)" },
+  { skip: enabled ? false : "set CRISPCTL_LIVE=1 or CRISP_LIVE=1 (dedicated test website only)" },
   async () => {
     const creds = resolveCredentials(process.env, {})
     assertComplete(creds)

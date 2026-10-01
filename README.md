@@ -24,7 +24,7 @@ See the [crisp-tui README](https://github.com/solcreek/crisp-tui#readme) for ins
 
 ## Live access
 
-Use the **Cos Crisp sandbox** website for development and write tests. Production **Teachify** access requires explicit authorization and must use `--read-only` or `CRISPCTL_READ_ONLY=1`. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
+Use a dedicated test website for development and write tests. Access to production websites requires explicit authorization and must use `--read-only` or `CRISPCTL_READ_ONLY=1`. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
 
 ## Install
 
@@ -209,7 +209,7 @@ Aggregate coverage is enforced across all `src/` files, including unimported fil
 
 `npm run test:live` builds the CLI and runs the opt-in live suite. Both checks **skip** by default (exit 0):
 
-- REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials (Cos Sandbox only).
+- REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials for a dedicated test website.
 - RTM requires `CRISPCTL_LIVE_RTM=1`, an expected website name, and an authenticated `op` CLI. It reads `Crisp API Credentials` and requires receipt of an actual event within 60 seconds, not merely a successful handshake. It never sends messages or writes data.
 
 RTM defaults to `CRISPCTL_LIVE_RTM_MODE=event`. For a quiet website, set
@@ -235,7 +235,7 @@ export CRISPCTL_LIVE=1
 npm run test:live
 ```
 
-The REST opt-in above is for the **Cos Sandbox** website only. For explicitly authorized production RTM verification, use the read-only 1Password flow. Do not commit tokens or add them as CI secrets. CI runs `npm test` without live flags.
+The REST opt-in above is for a dedicated test website only. For explicitly authorized production RTM verification, use the read-only 1Password flow. Do not commit tokens or add them as CI secrets. CI runs `npm test` without live flags.
 
 ## Release
 
