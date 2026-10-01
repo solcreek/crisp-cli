@@ -14,3 +14,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 mock-crisp.mjs intercepts endpoint discovery in E2E child processes using undici's
 MockAgent. Unmatched REST requests cannot reach the network. The actual RTM traffic
 uses the real socket.io-client against a real local Socket.IO server.
+
+mock-smoke-child.mjs simulates the live smoke helper dependencies in an isolated
+child process, including stdout arriving after process exit. It uses fixture
+credentials and never contacts 1Password or Crisp.

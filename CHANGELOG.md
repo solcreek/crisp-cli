@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent false RTM live smoke failures by waiting for child output streams to close
+  before counting received events and reporting the result.
+
 ## [0.2.0] - 2026-10-01
 
 ### Added
