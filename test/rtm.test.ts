@@ -9,6 +9,7 @@ import { eventPayload, reference } from "./rtm-reference.js"
 import { CrispApiError } from "../src/errors.js"
 import { listen, parseEvents, positiveInteger, socketEndpoint, type ListenOptions, type SocketFactory } from "../src/rtm.js"
 import { buffers, credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from "./support.js"
+import { BodyDispatcher } from "./body-dispatcher.js"
 
 const creds: ClientCredentials = { ...FIXTURE, tier: "website" }
 const endpoint = { socket: { app: "wss://relay.crisp.chat/socket.io/?region=test" } }
@@ -364,4 +365,39 @@ test("reconnection uses a changed endpoint origin, path and query", async () => 
     { url: "wss://first.example.invalid", path: "/rtm/", query: { region: "a" } },
     { url: "wss://second.example.invalid", path: "/new-rtm/", query: { region: "b", token: "fixture" } },
   ])
+})
+
+test("discovery retries a real response-body reset and then authenticates", async () => {
+  const dispatcher = new BodyDispatcher((handler, attempt) => {
+    if (attempt === 1) {
+      handler.onData!(Buffer.from('{"data":'))
+      setImmediate(() => handler.onError!(new Error("body reset")))
+    } else {
+      handler.onData!(Buffer.from(JSON.stringify(okEnvelope(endpoint))))
+      handler.onComplete!([])
+    }
+  })
+  const h = harness((_payload, socket) => {
+    socket.receive("authenticated")
+    socket.receive("message:send", { website_id: creds.websiteId })
+  })
+  const statuses: string[] = []
+  await listen(new CrispClient(creds, dispatcher, true), creds, options(h.factory, {
+    count: 1, onStatus: status => statuses.push(status.status),
+  }))
+  assert.equal(dispatcher.attempts, 2)
+  assert.deepEqual(statuses, ["reconnecting", "authenticated"])
+  assert.ok(h.sockets.every(socket => socket.closed))
+})
+
+test("abort during response-body consumption stops without retry or socket creation", async () => {
+  const controller = new AbortController()
+  const dispatcher = new BodyDispatcher(handler => {
+    handler.onData!(Buffer.from('{"data":'))
+    setImmediate(() => controller.abort())
+  })
+  await listen(new CrispClient(creds, dispatcher, true), creds, options(() => { throw new Error("must not connect") }, {
+    signal: controller.signal, onStatus: () => assert.fail("must not retry"),
+  }))
+  assert.equal(dispatcher.attempts, 1)
 })

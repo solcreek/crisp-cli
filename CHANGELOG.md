@@ -9,6 +9,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Normalize network failures while reading HTTP response bodies so RTM endpoint
+  discovery reconnects after a partial-response disconnect.
 - Handle closed stdout pipes without an uncaught EPIPE, drain queued output before
   exit, and stop RTM with an explicit error when a slow consumer exceeds the 8 MiB
   output buffer limit.

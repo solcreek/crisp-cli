@@ -148,6 +148,7 @@ export class CrispClient {
     }
 
     let response: Awaited<ReturnType<typeof undiciFetch>>
+    let text: string
     try {
       response = await undiciFetch(url, {
         method,
@@ -157,12 +158,12 @@ export class CrispClient {
         dispatcher: this.dispatcher,
         signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
       })
+      text = await response.text()
     } catch (err) {
       const message = err instanceof Error ? err.message : "request failed"
       throw new CrispApiError(0, "network_error", message)
     }
 
-    const text = await response.text()
     const retryAfter = response.headers.get("retry-after") ?? undefined
     let payload: Envelope | null = null
     if (text.length > 0) {
