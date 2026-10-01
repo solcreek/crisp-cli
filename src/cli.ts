@@ -28,7 +28,10 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     const parsed = tree.prepare(argv)
     flags = parsed.flags
     const { positionals } = parsed
-    if (flags.help) { stdout(tree.help(positionals)); return 0 }
+    if (flags.help) {
+      stdout(tree.help(positionals))
+      return 0
+    }
     if (flags.version && positionals.length === 0) {
       writeOut(stdout, flags.json, flags.json ? { version } : version)
       return 0
@@ -40,7 +43,12 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
     return await tree.execute(argv, { ...options, stdout, stderr, env, flags })
   } catch (error) {
     const err = commandError(error)
-    writeErr(stderr, flags?.json ?? argv.includes("--json"), err, collectSecrets(env, flags ?? tree.flags(), argv))
+    writeErr(
+      stderr,
+      flags?.json ?? argv.includes("--json"),
+      err,
+      collectSecrets(env, flags ?? tree.flags(), argv),
+    )
     return exitCodeFor(err)
   }
 }

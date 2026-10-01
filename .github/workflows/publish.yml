@@ -3,7 +3,7 @@ name: Publish Package
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read
@@ -17,15 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # Required for OIDC
+      id-token: write # Required for OIDC
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false  # never use caching in release builds
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # never use caching in release builds
       - name: Check tag matches package.json version
         run: node -e "const version=require('./package.json').version; const tag=process.env.GITHUB_REF_NAME; if(tag!=='v'+version){console.error('GITHUB_REF_NAME '+JSON.stringify(tag)+' does not match package.json version '+version+' (expected v'+version+')'); process.exit(1)}"
       - run: npm ci

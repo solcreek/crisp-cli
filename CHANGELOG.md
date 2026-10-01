@@ -7,6 +7,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Enforce Oxfmt formatting and Oxlint correctness checks in local verification,
+  CI and the release gate, with pinned development dependencies and a separate
+  formatting baseline recorded for Git blame.
+
 ## [0.4.0] - 2026-10-01
 
 ### Changed

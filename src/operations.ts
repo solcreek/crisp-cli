@@ -28,13 +28,20 @@ export function authSet(io: IO): number {
 }
 
 export function authShow(io: IO): number {
-  const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
+  const creds = resolveCredentials(io.env, {
+    profile: io.flags.profile,
+    website: websiteOverride(io.flags),
+  })
   writeOut(io.stdout, io.flags.json, publicProfileView(creds))
   return 0
 }
 
 export async function conversationsList(io: IO): Promise<number> {
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversations(pageNumber(io.flags.page)))
+  writeOut(
+    io.stdout,
+    io.flags.json,
+    await clientFrom(io).listConversations(pageNumber(io.flags.page)),
+  )
   return 0
 }
 
@@ -47,8 +54,13 @@ export async function conversationsGet(io: IO, sessionRaw?: string): Promise<num
 export async function conversationsSearch(io: IO, queryRaw?: string): Promise<number> {
   const query = requireArg(queryRaw, usage.conversationsSearch)
   const searchType = io.flags.searchType ?? "text"
-  if (searchType !== "text" && searchType !== "segment") throw new UsageError("--search-type must be text or segment")
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType))
+  if (searchType !== "text" && searchType !== "segment")
+    throw new UsageError("--search-type must be text or segment")
+  writeOut(
+    io.stdout,
+    io.flags.json,
+    await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType),
+  )
   return 0
 }
 
@@ -66,7 +78,11 @@ export async function replyCommand(io: IO, sessionRaw?: string): Promise<number>
   if (hasText === hasNote) throw new UsageError(`usage: ${usage.reply}`)
   const content = hasText ? io.flags.text! : io.flags.note!
   if (!content.trim()) throw new UsageError(`usage: ${usage.reply}`)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).sendOperatorMessage(session, hasText ? "text" : "note", content))
+  writeOut(
+    io.stdout,
+    io.flags.json,
+    await clientFrom(io).sendOperatorMessage(session, hasText ? "text" : "note", content),
+  )
   return 0
 }
 
@@ -78,7 +94,11 @@ export function reopenCommand(io: IO, sessionRaw?: string): Promise<number> {
   return stateCommand(io, "unresolved", sessionRaw)
 }
 
-async function stateCommand(io: IO, state: "resolved" | "unresolved", sessionRaw?: string): Promise<number> {
+async function stateCommand(
+  io: IO,
+  state: "resolved" | "unresolved",
+  sessionRaw?: string,
+): Promise<number> {
   assertWritable(io)
   const session = requireArg(sessionRaw, state === "resolved" ? usage.resolve : usage.reopen)
   writeOut(io.stdout, io.flags.json, await clientFrom(io).setState(session, state))
@@ -99,7 +119,10 @@ export async function segmentsCommand(io: IO, sessionRaw?: string): Promise<numb
   assertWritable(io)
   const session = requireArg(sessionRaw, usage.segments)
   if (io.flags.set === undefined) throw new UsageError(`usage: ${usage.segments}`)
-  const segments = io.flags.set.split(",").map(part => part.trim()).filter(part => part.length > 0)
+  const segments = io.flags.set
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
   writeOut(io.stdout, io.flags.json, await clientFrom(io).setSegments(session, segments))
   return 0
 }
@@ -122,7 +145,10 @@ export async function operatorsList(io: IO): Promise<number> {
   return 0
 }
 
-function saveProfile(env: NodeJS.ProcessEnv, flags: Flags): {
+function saveProfile(
+  env: NodeJS.ProcessEnv,
+  flags: Flags,
+): {
   saved: true
   profile: string
   identifier: string
@@ -132,18 +158,17 @@ function saveProfile(env: NodeJS.ProcessEnv, flags: Flags): {
   const file = loadConfig(env)
   const name = selectedProfileName(env, flags.profile, file)
   const existing = file.profiles[name]
-  const identifier = flags.identifier?.trim()
-    || firstSet(env, ["CRISPCTL_IDENTIFIER", "CRISP_IDENTIFIER"])
-    || existing?.identifier
-  const key = flags.key?.trim()
-    || firstSet(env, ["CRISPCTL_KEY", "CRISP_KEY"])
-    || existing?.key
-  const tierRaw = flags.tier?.trim()
-    || firstSet(env, ["CRISPCTL_TIER", "CRISP_TIER"])
-    || existing?.tier
-  const website = websiteOverride(flags)
-    || firstSet(env, ["CRISPCTL_WEBSITE_ID", "CRISP_WEBSITE_ID"])
-    || existing?.website_id
+  const identifier =
+    flags.identifier?.trim() ||
+    firstSet(env, ["CRISPCTL_IDENTIFIER", "CRISP_IDENTIFIER"]) ||
+    existing?.identifier
+  const key = flags.key?.trim() || firstSet(env, ["CRISPCTL_KEY", "CRISP_KEY"]) || existing?.key
+  const tierRaw =
+    flags.tier?.trim() || firstSet(env, ["CRISPCTL_TIER", "CRISP_TIER"]) || existing?.tier
+  const website =
+    websiteOverride(flags) ||
+    firstSet(env, ["CRISPCTL_WEBSITE_ID", "CRISP_WEBSITE_ID"]) ||
+    existing?.website_id
   if (!identifier || !key || !tierRaw || !website) {
     throw new UsageError(`usage: ${usage.authSet}`)
   }
@@ -164,24 +189,38 @@ export async function listenCommand(io: IO): Promise<number> {
     for (const name of ["events", "session", "count", "timeout"] as const) {
       if (io.flags[name] !== undefined) throw new UsageError(`unexpected flag: --${name}`)
     }
-    writeOut(io.stdout, io.flags.json, { source: RTM_REFERENCE_URL, checked_at: RTM_REFERENCE_CHECKED, events: RTM_EVENTS })
+    writeOut(io.stdout, io.flags.json, {
+      source: RTM_REFERENCE_URL,
+      checked_at: RTM_REFERENCE_CHECKED,
+      events: RTM_EVENTS,
+    })
     return 0
   }
   const events = parseEvents(io.flags.events)
   const count = positiveInteger(io.flags.count, "count")
   const timeout = positiveInteger(io.flags.timeout, "timeout")
   if (timeout !== undefined && timeout > 2_147_483) throw new UsageError("--timeout is too large")
-  const session = io.flags.session === undefined ? undefined : requireArg(io.flags.session, usage.listen)
-  const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
+  const session =
+    io.flags.session === undefined ? undefined : requireArg(io.flags.session, usage.listen)
+  const creds = resolveCredentials(io.env, {
+    profile: io.flags.profile,
+    website: websiteOverride(io.flags),
+  })
   assertComplete(creds)
   const lifecycle = io.lifecycle ?? new RunLifecycle(io.signal)
   lifecycle.handleSignals()
   lifecycle.setDeadline(timeout)
   try {
     await listen(new CrispClient(creds, io.dispatcher, true), creds, {
-      events, session, count, signal: lifecycle.signal, socketFactory: io.socketFactory,
-      onEvent: event => writeOut(chunk => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
-      onStatus: status => writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
+      events,
+      session,
+      count,
+      signal: lifecycle.signal,
+      socketFactory: io.socketFactory,
+      onEvent: (event) =>
+        writeOut((chunk) => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
+      onStatus: (status) =>
+        writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
     })
     if (lifecycle.timedOut) throw lifecycle.timeoutError()
     return 0

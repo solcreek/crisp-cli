@@ -19,39 +19,45 @@ function client(dispatcher?: ConstructorParameters<typeof CrispClient>[1]): Cris
 }
 
 test("HTTP 200 with error:true is an API error", async () => {
-  await withCrispMock({
-    status: 200,
-    json: { error: true, reason: "invalid_session", data: { message: "nope" } },
-  }, async (dispatcher) => {
-    await assert.rejects(
-      () => client(dispatcher).listOperators(),
-      (err: unknown) => {
-        assert.ok(err instanceof CrispApiError)
-        assert.equal(err.status, 200)
-        assert.equal(err.reason, "invalid_session")
-        assert.equal(err.message, "nope")
-        return true
-      },
-    )
-  })
+  await withCrispMock(
+    {
+      status: 200,
+      json: { error: true, reason: "invalid_session", data: { message: "nope" } },
+    },
+    async (dispatcher) => {
+      await assert.rejects(
+        () => client(dispatcher).listOperators(),
+        (err: unknown) => {
+          assert.ok(err instanceof CrispApiError)
+          assert.equal(err.status, 200)
+          assert.equal(err.reason, "invalid_session")
+          assert.equal(err.message, "nope")
+          return true
+        },
+      )
+    },
+  )
 })
 
 test("401 without a reason string is unauthorized", async () => {
-  await withCrispMock({
-    status: 401,
-    json: { error: true, data: { message: 12 } },
-  }, async (dispatcher) => {
-    await assert.rejects(
-      () => client(dispatcher).listOperators(),
-      (err: unknown) => {
-        assert.ok(err instanceof CrispApiError)
-        assert.equal(err.status, 401)
-        assert.equal(err.reason, "unauthorized")
-        assert.equal(err.message, "unauthorized")
-        return true
-      },
-    )
-  })
+  await withCrispMock(
+    {
+      status: 401,
+      json: { error: true, data: { message: 12 } },
+    },
+    async (dispatcher) => {
+      await assert.rejects(
+        () => client(dispatcher).listOperators(),
+        (err: unknown) => {
+          assert.ok(err instanceof CrispApiError)
+          assert.equal(err.status, 401)
+          assert.equal(err.reason, "unauthorized")
+          assert.equal(err.message, "unauthorized")
+          return true
+        },
+      )
+    },
+  )
 })
 
 test("non-JSON error body keeps the status", async () => {
@@ -123,12 +129,15 @@ test("missing intercept surfaces a network error and does not call the origin", 
   agent.disableNetConnect()
   agent.get("https://api.crisp.chat")
   try {
-    const offline = new CrispClient({
-      identifier: FIXTURE.identifier,
-      key: FIXTURE.key,
-      tier: "website",
-      websiteId: FIXTURE.websiteId,
-    }, agent)
+    const offline = new CrispClient(
+      {
+        identifier: FIXTURE.identifier,
+        key: FIXTURE.key,
+        tier: "website",
+        websiteId: FIXTURE.websiteId,
+      },
+      agent,
+    )
     await assert.rejects(
       () => offline.listOperators(),
       (err: unknown) => {
@@ -145,42 +154,68 @@ test("missing intercept surfaces a network error and does not call the origin", 
 })
 
 test("session ids are encoded as a single path segment", async () => {
-  const calls = await withCrispMock({ status: 200, json: { error: false, data: { ok: true } } }, async (dispatcher) => {
-    await client(dispatcher).getConversation("a/b")
-  })
-  assert.equal(calls[0]?.path, `/v1/website/${FIXTURE.websiteId}/conversation/${encodeURIComponent("a/b")}`)
+  const calls = await withCrispMock(
+    { status: 200, json: { error: false, data: { ok: true } } },
+    async (dispatcher) => {
+      await client(dispatcher).getConversation("a/b")
+    },
+  )
+  assert.equal(
+    calls[0]?.path,
+    `/v1/website/${FIXTURE.websiteId}/conversation/${encodeURIComponent("a/b")}`,
+  )
 })
 
 test("connection reset after headers is normalized as a retriable network error", async () => {
-  const dispatcher = new BodyDispatcher(handler => {
+  const dispatcher = new BodyDispatcher((handler) => {
     handler.onData!(Buffer.from('{"data":'))
     setImmediate(() => handler.onError!(new Error("simulated reset")))
   })
-  await assert.rejects(client(dispatcher).getConnectEndpoints(), { name: "CrispApiError", status: 0, reason: "network_error" })
+  await assert.rejects(client(dispatcher).getConnectEndpoints(), {
+    name: "CrispApiError",
+    status: 0,
+    reason: "network_error",
+  })
 })
 
 test("cancellation and caller deadline interrupt an in-progress response body", async () => {
   for (const deadline of [false, true]) {
     const controller = new AbortController()
-    const dispatcher = new BodyDispatcher(handler => {
+    const dispatcher = new BodyDispatcher((handler) => {
       handler.onData!(Buffer.from('{"data":'))
       if (!deadline) setImmediate(() => controller.abort())
     })
     // Keep the test alive while AbortSignal.timeout's unref'ed timer expires.
     const keepAlive = setTimeout(() => {}, 1000)
     try {
-      await assert.rejects(client(dispatcher).getConnectEndpoints(deadline ? AbortSignal.timeout(10) : controller.signal),
-        { name: "CrispApiError", status: 0, reason: "network_error" })
-    } finally { clearTimeout(keepAlive) }
+      await assert.rejects(
+        client(dispatcher).getConnectEndpoints(
+          deadline ? AbortSignal.timeout(10) : controller.signal,
+        ),
+        { name: "CrispApiError", status: 0, reason: "network_error" },
+      )
+    } finally {
+      clearTimeout(keepAlive)
+    }
   }
 })
 
 test("body resets preserve error status and Retry-After already received in headers", async () => {
-  for (const [status, reason] of [[401, "unauthorized"], [403, "unauthorized"], [429, "rate_limited"], [503, "http_error"]] as const) {
-    const dispatcher = new BodyDispatcher(handler => {
+  for (const [status, reason] of [
+    [401, "unauthorized"],
+    [403, "unauthorized"],
+    [429, "rate_limited"],
+    [503, "http_error"],
+  ] as const) {
+    const dispatcher = new BodyDispatcher((handler) => {
       handler.onData!(Buffer.from('{"data":'))
       setImmediate(() => handler.onError!(new Error("body reset")))
     }, status)
-    await assert.rejects(client(dispatcher).getConnectEndpoints(), { name: "CrispApiError", status, reason, retryAfter: "2" })
+    await assert.rejects(client(dispatcher).getConnectEndpoints(), {
+      name: "CrispApiError",
+      status,
+      reason,
+      retryAfter: "2",
+    })
   }
 })

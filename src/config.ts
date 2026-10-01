@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { ConfigError } from "./errors.js"
@@ -170,7 +178,13 @@ export function resolveCredentials(
       identifier: identifierEnv ? "env" : stored?.identifier ? "file" : "missing",
       key: keyEnv ? "env" : stored?.key ? "file" : "missing",
       tier: tierSource,
-      websiteId: websiteFlag ? "flag" : websiteEnv ? "env" : stored?.website_id ? "file" : "missing",
+      websiteId: websiteFlag
+        ? "flag"
+        : websiteEnv
+          ? "env"
+          : stored?.website_id
+            ? "file"
+            : "missing",
     },
   }
 }

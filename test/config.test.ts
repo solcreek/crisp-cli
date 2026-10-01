@@ -1,5 +1,13 @@
 import assert from "node:assert/strict"
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -23,7 +31,10 @@ function homeEnv(): { env: NodeJS.ProcessEnv; cleanup: () => void } {
 }
 
 test("config path honors CRISPCTL_CONFIG, XDG_CONFIG_HOME, then HOME", () => {
-  assert.equal(configFilePath({ CRISPCTL_CONFIG: "/tmp/explicit.json", HOME: "/home/ignored" }), "/tmp/explicit.json")
+  assert.equal(
+    configFilePath({ CRISPCTL_CONFIG: "/tmp/explicit.json", HOME: "/home/ignored" }),
+    "/tmp/explicit.json",
+  )
   assert.equal(
     configFilePath({ XDG_CONFIG_HOME: "/tmp/xdg", HOME: "/home/ignored" }),
     "/tmp/xdg/crispctl/config.json",
@@ -48,7 +59,10 @@ test("saveConfig writes mode 0600 and a 0700 directory", () => {
     const path = configFilePath(env)
     assert.equal(statSync(path).mode & 0o777, 0o600)
     assert.equal(statSync(join(env.HOME ?? "", ".config", "crispctl")).mode & 0o777, 0o700)
-    const stored = JSON.parse(readFileSync(path, "utf8")) as { current: string; profiles: { sandbox: { key: string } } }
+    const stored = JSON.parse(readFileSync(path, "utf8")) as {
+      current: string
+      profiles: { sandbox: { key: string } }
+    }
     assert.equal(stored.current, "sandbox")
     assert.equal(stored.profiles.sandbox.key, "sandbox-token-key")
   } finally {
@@ -63,7 +77,10 @@ test("loadConfig rejects invalid documents", () => {
     env.CRISPCTL_CONFIG = path
     mkdirSync(env.HOME ?? "", { recursive: true })
     writeFileSync(path, "{", { mode: 0o600 })
-    assert.throws(() => loadConfig(env), (err: unknown) => err instanceof ConfigError && /valid JSON/.test(err.message))
+    assert.throws(
+      () => loadConfig(env),
+      (err: unknown) => err instanceof ConfigError && /valid JSON/.test(err.message),
+    )
 
     writeFileSync(path, "[]", { mode: 0o600 })
     assert.throws(() => loadConfig(env), /JSON object/)
@@ -74,14 +91,22 @@ test("loadConfig rejects invalid documents", () => {
     writeFileSync(path, JSON.stringify({ profiles: { "../x": {} } }), { mode: 0o600 })
     assert.throws(() => loadConfig(env), /invalid profile name/)
 
-    writeFileSync(path, JSON.stringify({
-      profiles: { sandbox: { identifier: "a", key: "b", tier: "user", website_id: "c" } },
-    }), { mode: 0o600 })
+    writeFileSync(
+      path,
+      JSON.stringify({
+        profiles: { sandbox: { identifier: "a", key: "b", tier: "user", website_id: "c" } },
+      }),
+      { mode: 0o600 },
+    )
     assert.throws(() => loadConfig(env), /tier must be website or plugin/)
 
-    writeFileSync(path, JSON.stringify({
-      profiles: { sandbox: { identifier: "a", key: "", tier: "plugin", website_id: "c" } },
-    }), { mode: 0o600 })
+    writeFileSync(
+      path,
+      JSON.stringify({
+        profiles: { sandbox: { identifier: "a", key: "", tier: "plugin", website_id: "c" } },
+      }),
+      { mode: 0o600 },
+    )
     assert.throws(() => loadConfig(env), /missing key/)
 
     writeFileSync(path, JSON.stringify({ current: "" }), { mode: 0o600 })
@@ -159,8 +184,14 @@ test("env overrides file and CRISPCTL_* wins over CRISP_*", () => {
 
 test("missing credentials and invalid tier are config errors", () => {
   const creds = resolveCredentials({ HOME: "/does/not/matter" }, {}, { profiles: {} })
-  assert.throws(() => assertComplete(creds), /missing credentials: identifier, key, tier, website_id/)
-  assert.throws(() => resolveCredentials({ CRISP_TIER: "user" }, {}, { profiles: {} }), /tier must be website or plugin/)
+  assert.throws(
+    () => assertComplete(creds),
+    /missing credentials: identifier, key, tier, website_id/,
+  )
+  assert.throws(
+    () => resolveCredentials({ CRISP_TIER: "user" }, {}, { profiles: {} }),
+    /tier must be website or plugin/,
+  )
   assert.equal(publicProfileView(creds).key, "missing")
   assert.equal(publicProfileView(creds).tier, null)
 })
@@ -174,11 +205,14 @@ test("unreadable config directory surfaces a config error without the key", () =
     const env = {
       CRISPCTL_CONFIG: join(blocked, "nested", "config.json"),
     }
-    assert.throws(() => saveConfig(env, { profiles: {} }), (err: unknown) => {
-      assert.ok(err instanceof ConfigError)
-      assert.match(err.message, /could not write config file/)
-      return true
-    })
+    assert.throws(
+      () => saveConfig(env, { profiles: {} }),
+      (err: unknown) => {
+        assert.ok(err instanceof ConfigError)
+        assert.match(err.message, /could not write config file/)
+        return true
+      },
+    )
   } finally {
     chmodSync(join(root, "blocked"), 0o700)
     rmSync(root, { recursive: true, force: true })
@@ -186,7 +220,10 @@ test("unreadable config directory surfaces a config error without the key", () =
 })
 
 test("redactSecrets replaces every non-empty secret", () => {
-  assert.equal(redactSecrets("token fixture-token-key-do-not-log end", ["fixture-token-key-do-not-log"]), "token [redacted] end")
+  assert.equal(
+    redactSecrets("token fixture-token-key-do-not-log end", ["fixture-token-key-do-not-log"]),
+    "token [redacted] end",
+  )
   assert.equal(redactSecrets("abc abc", ["abc"]), "[redacted] [redacted]")
   assert.equal(redactSecrets("ab", ["a", "ab"]), "[redacted]")
   assert.equal(redactSecrets("a.b aXb", ["a.b"]), "[redacted] aXb")

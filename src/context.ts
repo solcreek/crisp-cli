@@ -13,4 +13,3 @@ export type IO = {
   socketFactory?: SocketFactory
   flags: Flags
 }
-

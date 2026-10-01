@@ -24,9 +24,11 @@ export type ListenOptions = {
 
 export function parseEvents(raw?: string): string[] {
   if (raw === undefined) return [...DEFAULT_EVENTS]
-  const events = [...new Set(raw.split(",").map(value => value.trim()))]
-  if (events.some(event => !/^[a-z][a-z0-9_]*(?::[a-z][a-z0-9_]*)+$/.test(event))) {
-    throw new UsageError("--events must contain comma-separated RTM event names (for example message:send)")
+  const events = [...new Set(raw.split(",").map((value) => value.trim()))]
+  if (events.some((event) => !/^[a-z][a-z0-9_]*(?::[a-z][a-z0-9_]*)+$/.test(event))) {
+    throw new UsageError(
+      "--events must contain comma-separated RTM event names (for example message:send)",
+    )
   }
   return events
 }
@@ -46,9 +48,14 @@ export function socketEndpoint(data: unknown): URL {
   try {
     if (typeof app !== "string") throw new Error()
     endpoint = new URL(app)
-    if (endpoint.protocol !== "wss:" || endpoint.username || endpoint.password || endpoint.hash) throw new Error()
+    if (endpoint.protocol !== "wss:" || endpoint.username || endpoint.password || endpoint.hash)
+      throw new Error()
   } catch {
-    throw new CrispApiError(200, "invalid_endpoint", "Crisp did not return a valid secure RTM socket.app endpoint")
+    throw new CrispApiError(
+      200,
+      "invalid_endpoint",
+      "Crisp did not return a valid secure RTM socket.app endpoint",
+    )
   }
   return endpoint
 }
@@ -68,7 +75,7 @@ export async function listen(
     try {
       const endpoint = socketEndpoint(await client.getConnectEndpoints(options.signal))
       if (options.signal.aborted) break
-      const result = await connection(endpoint, creds, options, event => {
+      const result = await connection(endpoint, creds, options, (event) => {
         options.onEvent(event)
         received++
         return options.count !== undefined && received >= options.count
@@ -77,14 +84,19 @@ export async function listen(
       if (result === "connected") failures = 0
     } catch (error) {
       if (options.signal.aborted) break
-      if (!(error instanceof CrispApiError) ||
-          ![0, 429, 500, 502, 503, 504].includes(error.status)) throw error
+      if (!(error instanceof CrispApiError) || ![0, 429, 500, 502, 503, 504].includes(error.status))
+        throw error
       retryAfter = error.retryAfter
     }
     if (options.signal.aborted) break
     options.onStatus({ status: "reconnecting", website_id: creds.websiteId })
-    const backoff = retryDelay(failures++, options.reconnectDelayMs ?? 1000,
-      (options.retry?.random ?? Math.random)(), (options.retry?.now ?? Date.now)(), retryAfter)
+    const backoff = retryDelay(
+      failures++,
+      options.reconnectDelayMs ?? 1000,
+      (options.retry?.random ?? Math.random)(),
+      (options.retry?.now ?? Date.now)(),
+      retryAfter,
+    )
     try {
       await (options.retry?.sleep ?? waitForRetry)(backoff, options.signal)
     } catch (error) {
@@ -142,7 +154,16 @@ function connection(
         finish("done", error as Error)
       }
     })
-    socket.on("unauthorized", () => finish("done", new CrispApiError(401, "unauthorized", "RTM authentication rejected; check token tier, scopes and website access")))
+    socket.on("unauthorized", () =>
+      finish(
+        "done",
+        new CrispApiError(
+          401,
+          "unauthorized",
+          "RTM authentication rejected; check token tier, scopes and website access",
+        ),
+      ),
+    )
     socket.on("connect_error", () => finish("retry"))
     socket.on("disconnect", () => finish(authenticated ? "connected" : "retry"))
     for (const event of options.events) {
@@ -162,7 +183,8 @@ function connection(
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown> : undefined
+    ? (value as Record<string, unknown>)
+    : undefined
 }
 
 function matchesScope(event: string, data: unknown, websiteId: string, session?: string): boolean {
@@ -176,7 +198,9 @@ function matchesScope(event: string, data: unknown, websiteId: string, session?:
     if (payload.website_id !== undefined && payload.website_id !== websiteId) return false
   } else if (payload.website_id !== websiteId) return false
   if (!session) return true
-  const sessionId = event === "email:track:view" && payload.type === "session"
-    ? payload.identifier : payload.session_id
+  const sessionId =
+    event === "email:track:view" && payload.type === "session"
+      ? payload.identifier
+      : payload.session_id
   return sessionId === session
 }

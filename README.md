@@ -64,13 +64,13 @@ crispctl auth show --profile sandbox
 
 Resolution order, highest first:
 
-| Field | Order |
-| --- | --- |
-| Profile name | `--profile`, `CRISPCTL_PROFILE`, `current` in the file, then `default` |
-| Identifier | `CRISPCTL_IDENTIFIER`, `CRISP_IDENTIFIER`, profile |
-| Key | `CRISPCTL_KEY`, `CRISP_KEY`, profile |
-| Website | `--website` or `--website-id`, `CRISPCTL_WEBSITE_ID`, `CRISP_WEBSITE_ID`, profile |
-| Tier | `CRISPCTL_TIER`, `CRISP_TIER`, profile |
+| Field        | Order                                                                             |
+| ------------ | --------------------------------------------------------------------------------- |
+| Profile name | `--profile`, `CRISPCTL_PROFILE`, `current` in the file, then `default`            |
+| Identifier   | `CRISPCTL_IDENTIFIER`, `CRISP_IDENTIFIER`, profile                                |
+| Key          | `CRISPCTL_KEY`, `CRISP_KEY`, profile                                              |
+| Website      | `--website` or `--website-id`, `CRISPCTL_WEBSITE_ID`, `CRISP_WEBSITE_ID`, profile |
+| Tier         | `CRISPCTL_TIER`, `CRISP_TIER`, profile                                            |
 
 Global flags (any position): `--json`, `--read-only`, `--profile`, `--website`.
 
@@ -92,23 +92,23 @@ crispctl operators list
 crispctl listen
 ```
 
-| Command | HTTP |
-| --- | --- |
-| `conversations list [--page n]` | `GET /v1/website/{website_id}/conversations/{page}` |
-| `conversations get <session>` | `GET /v1/website/{website_id}/conversation/{session}` |
-| `conversations search <query>` | `GET /v1/website/{website_id}/conversations/{page}?search_query&search_type` (`text` or `segment`) |
-| `messages list <session>` | `GET /v1/website/{website_id}/conversation/{session}/messages` |
-| `reply <session> --text` | `POST .../message` `{"type":"text","from":"operator","origin":"chat","content":"..."}` |
-| `reply <session> --note` | `POST .../message` `{"type":"note","from":"operator","origin":"chat","content":"..."}` |
-| `resolve <session>` | `PATCH .../state` `{"state":"resolved"}` |
-| `reopen <session>` | `PATCH .../state` `{"state":"unresolved"}` |
-| `assign <session> --user <id>` | `PATCH .../routing` `{"assigned":{"user_id":"<id>"}}` |
-| `assign <session> --unassign` | `PATCH .../routing` `{"assigned":null}` |
-| `segments <session> --set a,b` | `PATCH .../meta` `{"segments":["a","b"]}` |
-| `read <session>` | `PATCH .../read` `{"from":"operator","origin":"chat"}` |
-| `people get <id>` | `GET /v1/website/{website_id}/people/profile/{people_id}` |
-| `people get <email>` | `GET .../people/profiles/1?search_text=<email>`, then `GET .../people/profile/{people_id}` for the exact email match |
-| `operators list` | `GET /v1/website/{website_id}/operators/list` |
+| Command                         | HTTP                                                                                                                 |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `conversations list [--page n]` | `GET /v1/website/{website_id}/conversations/{page}`                                                                  |
+| `conversations get <session>`   | `GET /v1/website/{website_id}/conversation/{session}`                                                                |
+| `conversations search <query>`  | `GET /v1/website/{website_id}/conversations/{page}?search_query&search_type` (`text` or `segment`)                   |
+| `messages list <session>`       | `GET /v1/website/{website_id}/conversation/{session}/messages`                                                       |
+| `reply <session> --text`        | `POST .../message` `{"type":"text","from":"operator","origin":"chat","content":"..."}`                               |
+| `reply <session> --note`        | `POST .../message` `{"type":"note","from":"operator","origin":"chat","content":"..."}`                               |
+| `resolve <session>`             | `PATCH .../state` `{"state":"resolved"}`                                                                             |
+| `reopen <session>`              | `PATCH .../state` `{"state":"unresolved"}`                                                                           |
+| `assign <session> --user <id>`  | `PATCH .../routing` `{"assigned":{"user_id":"<id>"}}`                                                                |
+| `assign <session> --unassign`   | `PATCH .../routing` `{"assigned":null}`                                                                              |
+| `segments <session> --set a,b`  | `PATCH .../meta` `{"segments":["a","b"]}`                                                                            |
+| `read <session>`                | `PATCH .../read` `{"from":"operator","origin":"chat"}`                                                               |
+| `people get <id>`               | `GET /v1/website/{website_id}/people/profile/{people_id}`                                                            |
+| `people get <email>`            | `GET .../people/profiles/1?search_text=<email>`, then `GET .../people/profile/{people_id}` for the exact email match |
+| `operators list`                | `GET /v1/website/{website_id}/operators/list`                                                                        |
 
 Requests send HTTP Basic auth (`identifier:key`) and `X-Crisp-Tier`. Stdout is the Crisp `data` payload.
 
@@ -137,7 +137,11 @@ The event catalog was checked against all 82 namespaces in the official RTM v1 r
 The default events are `message:send`, `message:received`, and `session:set_state`. `--events` selects comma-separated event names; token scopes must allow them. `--session` filters received events locally by `session_id`, or by `identifier` for `email:track:view` when `type` is `session`. Events with no recognized session identifier are excluded by this filter; arbitrary plugin payload fields are not interpreted as routing metadata. Bucket URL events use `resource.type === "website"` and `resource.id` to match the website, instead of a top-level `website_id`. `--json` writes newline-delimited JSON to stdout:
 
 ```json
-{"event":"session:set_state","data":{"website_id":"...","session_id":"session_...","state":"resolved"},"received_at":"2026-10-01T12:00:00.000Z"}
+{
+  "event": "session:set_state",
+  "data": { "website_id": "...", "session_id": "session_...", "state": "resolved" },
+  "received_at": "2026-10-01T12:00:00.000Z"
+}
 ```
 
 Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff and equal jitter, capped at 30 seconds. A valid HTTP `Retry-After` (seconds or a canonical IMF-fixdate timestamp) is honored as a minimum and may exceed that cap; all waits remain cancellable. Incomplete dates, invalid calendar values and weekday mismatches fall back to the jittered backoff. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
@@ -174,10 +178,25 @@ The script reads `Crisp API Credentials` (`API Identifier`, `API Key`, `website_
 Unit and HTTP contract tests use undici [`MockAgent`](https://undici.nodejs.org/#/docs/api/MockAgent) against `https://api.crisp.chat`. Each MVP verb has a happy path plus HTTP 400 and 429. The mock is the client's dispatcher, so the test sees the real path, query, and body. Nothing in `npm test` contacts Crisp.
 
 ```bash
+npm run fmt
+npm run lint
 npm test
 npm run typecheck
 npm run verify
 ```
+
+Formatting uses [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), and
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) checks correctness, variable
+shadowing and strict equality across source, tests and scripts. Both tools run
+from pinned dev dependencies; no Rust installation is needed. `npm run fmt:check`
+checks formatting without changing files, and `npm run lint:fix` applies safe lint
+fixes. Warnings fail the lint gate. Generated build/coverage files and npm's
+lockfile are excluded from formatting, as is the captured RTM reference snapshot.
+TypeScript remains responsible for type checking and building the CLI.
+
+The mechanical formatting commit is recorded in `.git-blame-ignore-revs`. Use
+`git blame --ignore-revs-file .git-blame-ignore-revs <file>` to see the preceding
+history when reviewing code ownership.
 
 `npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 22 and 24. No Crisp credentials or external services are needed.
 
@@ -188,18 +207,18 @@ read-only mode before writes. REST, RTM, output and lifecycle code remain separa
 from the command framework. CLI compatibility tests cover option placement,
 literal values, help, concurrent invocations and credential redaction on errors.
 
-`npm run verify` runs typecheck, offline tests, the RTM coverage gate and
+`npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM coverage gate and
 `test:package`. The package smoke installs an actual tarball into a temporary
 directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
 
-| Layer | What it verifies | Included in CI |
-| --- | --- | --- |
-| Unit | Argument parsing, config, redaction, RTM filtering/retry/cancellation, write rejection | Yes |
-| HTTP integration | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors | Yes |
-| CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes |
-| Live smoke | Real Crisp REST or RTM, explicitly enabled locally | No |
-| Package smoke | Install the packed artifact and execute its installed bin | Yes |
+| Layer                     | What it verifies                                                                                                                                                                        | Included in CI |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| Unit                      | Argument parsing, config, redaction, RTM filtering/retry/cancellation, write rejection                                                                                                  | Yes            |
+| HTTP integration          | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors                                                                                                    | Yes            |
+| CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes            |
+| Live smoke                | Real Crisp REST or RTM, explicitly enabled locally                                                                                                                                      | No             |
+| Package smoke             | Install the packed artifact and execute its installed bin                                                                                                                               | Yes            |
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
@@ -246,7 +265,7 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including formatting, lint, typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 
 Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
 `.github/workflows/verify.yml` as releases. No live Crisp calls are included.

@@ -7,7 +7,14 @@ import { test } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { isDirectInvocation } from "../src/index.js"
 import { run } from "../src/cli.js"
-import { buffers, credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from "./support.js"
+import {
+  buffers,
+  credentialEnv,
+  FIXTURE,
+  okEnvelope,
+  removeHome,
+  withCrispMock,
+} from "./support.js"
 
 const COMMANDS = [
   "auth set",
@@ -39,7 +46,20 @@ test("root help lists every MVP command", async () => {
 })
 
 test("subcommand help exits 0", async () => {
-  for (const command of ["auth", "conversations", "messages", "reply", "resolve", "reopen", "assign", "segments", "read", "people", "operators", "listen"]) {
+  for (const command of [
+    "auth",
+    "conversations",
+    "messages",
+    "reply",
+    "resolve",
+    "reopen",
+    "assign",
+    "segments",
+    "read",
+    "people",
+    "operators",
+    "listen",
+  ]) {
     const io = buffers()
     const code = await run([command, "--help"], { ...io, env: { HOME: tmpdir() } })
     assert.equal(code, 0, command)
@@ -71,10 +91,13 @@ test("version, unknown command, and usage errors", async () => {
   assert.match(unknown.err(), /unknown command: nope/)
 
   const reply = buffers()
-  assert.equal(await run(["--json", "reply", FIXTURE.session, "--text", "hi", "--note", "x"], {
-    ...reply,
-    env: credentialEnv(),
-  }), 2)
+  assert.equal(
+    await run(["--json", "reply", FIXTURE.session, "--text", "hi", "--note", "x"], {
+      ...reply,
+      env: credentialEnv(),
+    }),
+    2,
+  )
   assert.equal(JSON.parse(reply.err()).error, "usage")
 
   const assign = buffers()
@@ -83,16 +106,25 @@ test("version, unknown command, and usage errors", async () => {
     assert.equal(await run(["assign", FIXTURE.session], { ...assign, env }), 2)
     assert.match(assign.err(), /assign/)
     const both = buffers()
-    assert.equal(await run(["assign", FIXTURE.session, "--user", "u", "--unassign"], { ...both, env }), 2)
+    assert.equal(
+      await run(["assign", FIXTURE.session, "--user", "u", "--unassign"], { ...both, env }),
+      2,
+    )
     const page = buffers()
     assert.equal(await run(["conversations", "list", "--page", "0"], { ...page, env }), 2)
     const search = buffers()
-    assert.equal(await run(["conversations", "search", "q", "--search-type", "filter"], { ...search, env }), 2)
+    assert.equal(
+      await run(["conversations", "search", "q", "--search-type", "filter"], { ...search, env }),
+      2,
+    )
     const flag = buffers()
     assert.equal(await run(["resolve", FIXTURE.session, "--text", "nope"], { ...flag, env }), 2)
     assert.match(flag.err(), /unexpected flag/)
     const disagree = buffers()
-    assert.equal(await run(["--website", "a", "--website-id", "b", "operators", "list"], { ...disagree, env }), 2)
+    assert.equal(
+      await run(["--website", "a", "--website-id", "b", "operators", "list"], { ...disagree, env }),
+      2,
+    )
     assert.match(disagree.err(), /disagree/)
     const short = buffers()
     assert.equal(await run(["-x"], { ...short, env }), 2)
@@ -113,15 +145,24 @@ test("auth set stores a 0600 profile and auth show redacts the key", async () =>
   const key = "sandbox-profile-token-key"
   try {
     const setIo = buffers()
-    const code = await run([
-      "--profile", "sandbox",
-      "--json",
-      "auth", "set",
-      "--identifier", "id-sandbox",
-      "--key", key,
-      "--tier", "website",
-      "--website", "website-sandbox",
-    ], { ...setIo, env })
+    const code = await run(
+      [
+        "--profile",
+        "sandbox",
+        "--json",
+        "auth",
+        "set",
+        "--identifier",
+        "id-sandbox",
+        "--key",
+        key,
+        "--tier",
+        "website",
+        "--website",
+        "website-sandbox",
+      ],
+      { ...setIo, env },
+    )
     assert.equal(code, 0)
     const saved = JSON.parse(setIo.out()) as { profile: string; website_id: string }
     assert.equal(saved.profile, "sandbox")
@@ -130,13 +171,21 @@ test("auth set stores a 0600 profile and auth show redacts the key", async () =>
 
     const path = join(home, ".config", "crispctl", "config.json")
     assert.equal(statSync(path).mode & 0o777, 0o600)
-    const file = JSON.parse(readFileSync(path, "utf8")) as { current: string; profiles: { sandbox: { key: string } } }
+    const file = JSON.parse(readFileSync(path, "utf8")) as {
+      current: string
+      profiles: { sandbox: { key: string } }
+    }
     assert.equal(file.current, "sandbox")
     assert.equal(file.profiles.sandbox.key, key)
 
     const showIo = buffers()
     assert.equal(await run(["auth", "show", "--json"], { ...showIo, env }), 0)
-    const view = JSON.parse(showIo.out()) as { key: string; profile: string; tier: string; identifier: string }
+    const view = JSON.parse(showIo.out()) as {
+      key: string
+      profile: string
+      tier: string
+      identifier: string
+    }
     assert.equal(view.key, "set")
     assert.equal(view.profile, "sandbox")
     assert.equal(view.tier, "website")
@@ -145,9 +194,14 @@ test("auth set stores a 0600 profile and auth show redacts the key", async () =>
     assert.equal(showIo.err().includes(key), false)
 
     const partial = buffers()
-    assert.equal(await run(["--profile", "sandbox", "auth", "set", "--tier", "plugin"], { ...partial, env }), 0)
+    assert.equal(
+      await run(["--profile", "sandbox", "auth", "set", "--tier", "plugin"], { ...partial, env }),
+      0,
+    )
     assert.equal(partial.out().includes(key), false)
-    const updated = JSON.parse(readFileSync(path, "utf8")) as { profiles: { sandbox: { key: string; tier: string } } }
+    const updated = JSON.parse(readFileSync(path, "utf8")) as {
+      profiles: { sandbox: { key: string; tier: string } }
+    }
     assert.equal(updated.profiles.sandbox.key, key)
     assert.equal(updated.profiles.sandbox.tier, "plugin")
   } finally {
@@ -205,15 +259,22 @@ test("human errors stay on stderr", async () => {
   const env = credentialEnv()
   const io = buffers()
   try {
-    await withCrispMock({
-      status: 404,
-      json: { error: true, reason: "not_found", data: { message: "missing" } },
-    }, async (dispatcher) => {
-      const code = await run(["conversations", "get", FIXTURE.session], { ...io, env, dispatcher })
-      assert.equal(code, 1)
-      assert.equal(io.out(), "")
-      assert.match(io.err(), /404 not_found: missing/)
-    })
+    await withCrispMock(
+      {
+        status: 404,
+        json: { error: true, reason: "not_found", data: { message: "missing" } },
+      },
+      async (dispatcher) => {
+        const code = await run(["conversations", "get", FIXTURE.session], {
+          ...io,
+          env,
+          dispatcher,
+        })
+        assert.equal(code, 1)
+        assert.equal(io.out(), "")
+        assert.match(io.err(), /404 not_found: missing/)
+      },
+    )
   } finally {
     removeHome(env)
   }
@@ -223,7 +284,10 @@ test("bin --help runs as the CLI entry", () => {
   const entry = fileURLToPath(new URL("../src/index.ts", import.meta.url))
   assert.equal(isDirectInvocation(entry, pathToFileURL(entry).href), true)
   assert.equal(isDirectInvocation(undefined, pathToFileURL(entry).href), false)
-  assert.equal(isDirectInvocation(join(tmpdir(), "missing-entry"), pathToFileURL(entry).href), false)
+  assert.equal(
+    isDirectInvocation(join(tmpdir(), "missing-entry"), pathToFileURL(entry).href),
+    false,
+  )
 
   const home = mkdtempSync(join(tmpdir(), "crispctl-bin-"))
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home }

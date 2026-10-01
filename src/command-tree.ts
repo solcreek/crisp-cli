@@ -38,32 +38,111 @@ type Definition = {
   run: (io: IO, argument?: string) => number | Promise<number>
 }
 const DEFINITIONS: readonly Definition[] = [
-  { path: "auth set", description: "Save a credential profile", options: ["identifier", "key", "tier"], run: operations.authSet },
-  { path: "auth show", description: "Show the profile with the key redacted", run: operations.authShow },
-  { path: "conversations list", description: "List conversations", options: ["page"], run: operations.conversationsList },
-  { path: "conversations get", description: "Get one conversation", argument: "<session>", run: operations.conversationsGet },
-  { path: "conversations search", description: "Search conversations", argument: "<query>", options: ["page", "search-type"], run: operations.conversationsSearch },
-  { path: "messages list", description: "List messages in a session", argument: "<session>", run: operations.messagesList },
-  { path: "reply", description: "Send an operator message or private note", argument: "<session>", options: ["text", "note"], run: operations.replyCommand },
-  { path: "resolve", description: "Set conversation state to resolved", argument: "<session>", run: operations.resolveCommand },
-  { path: "reopen", description: "Set conversation state to unresolved", argument: "<session>", run: operations.reopenCommand },
-  { path: "assign", description: "Assign or unassign an operator", argument: "<session>", options: ["user", "unassign"], run: operations.assignCommand },
-  { path: "segments", description: "Replace conversation segments", argument: "<session>", options: ["set"], run: operations.segmentsCommand },
-  { path: "read", description: "Mark the conversation read", argument: "<session>", run: operations.readCommand },
-  { path: "people get", description: "Get a people profile by ID or email", argument: "<id|email>", run: operations.peopleGet },
+  {
+    path: "auth set",
+    description: "Save a credential profile",
+    options: ["identifier", "key", "tier"],
+    run: operations.authSet,
+  },
+  {
+    path: "auth show",
+    description: "Show the profile with the key redacted",
+    run: operations.authShow,
+  },
+  {
+    path: "conversations list",
+    description: "List conversations",
+    options: ["page"],
+    run: operations.conversationsList,
+  },
+  {
+    path: "conversations get",
+    description: "Get one conversation",
+    argument: "<session>",
+    run: operations.conversationsGet,
+  },
+  {
+    path: "conversations search",
+    description: "Search conversations",
+    argument: "<query>",
+    options: ["page", "search-type"],
+    run: operations.conversationsSearch,
+  },
+  {
+    path: "messages list",
+    description: "List messages in a session",
+    argument: "<session>",
+    run: operations.messagesList,
+  },
+  {
+    path: "reply",
+    description: "Send an operator message or private note",
+    argument: "<session>",
+    options: ["text", "note"],
+    run: operations.replyCommand,
+  },
+  {
+    path: "resolve",
+    description: "Set conversation state to resolved",
+    argument: "<session>",
+    run: operations.resolveCommand,
+  },
+  {
+    path: "reopen",
+    description: "Set conversation state to unresolved",
+    argument: "<session>",
+    run: operations.reopenCommand,
+  },
+  {
+    path: "assign",
+    description: "Assign or unassign an operator",
+    argument: "<session>",
+    options: ["user", "unassign"],
+    run: operations.assignCommand,
+  },
+  {
+    path: "segments",
+    description: "Replace conversation segments",
+    argument: "<session>",
+    options: ["set"],
+    run: operations.segmentsCommand,
+  },
+  {
+    path: "read",
+    description: "Mark the conversation read",
+    argument: "<session>",
+    run: operations.readCommand,
+  },
+  {
+    path: "people get",
+    description: "Get a people profile by ID or email",
+    argument: "<id|email>",
+    run: operations.peopleGet,
+  },
   { path: "operators list", description: "List website operators", run: operations.operatorsList },
-  { path: "listen", description: "Stream RTM events with automatic reconnection", options: ["events", "session", "count", "timeout", "list-events"], run: operations.listenCommand },
+  {
+    path: "listen",
+    description: "Stream RTM events with automatic reconnection",
+    options: ["events", "session", "count", "timeout", "list-events"],
+    run: operations.listenCommand,
+  },
 ]
 
 // A fresh tree per invocation: no global program, process exit, or direct diagnostics.
 export function createCommandTree() {
-  const create = (name: string) => new Command(name).exitOverride().helpOption(false).addHelpCommand(false)
-    .allowExcessArguments(false).showSuggestionAfterError(false)
-    .configureHelp({ showGlobalOptions: true })
-    .configureOutput({ writeOut: () => {}, writeErr: () => {} })
+  const create = (name: string) =>
+    new Command(name)
+      .exitOverride()
+      .helpOption(false)
+      .addHelpCommand(false)
+      .allowExcessArguments(false)
+      .showSuggestionAfterError(false)
+      .configureHelp({ showGlobalOptions: true })
+      .configureOutput({ writeOut: () => {}, writeErr: () => {} })
   const root = create("crispctl").description("Agent-friendly Crisp REST and RTM CLI")
   const optionDefinitions = OPTIONS.map(([flags, description]) => new Option(flags, description))
-  for (const option of optionDefinitions) root.addOption(option.hideHelp(!GLOBAL_FLAGS.has(option.name())))
+  for (const option of optionDefinitions)
+    root.addOption(option.hideHelp(!GLOBAL_FLAGS.has(option.name())))
   const leaves: Command[] = []
   let io: IO
   let result = 0
@@ -72,10 +151,14 @@ export function createCommandTree() {
     const path = definition.path.split(" ")
     let parent = root
     for (const name of path.slice(0, -1)) {
-      let group = parent.commands.find(command => command.name() === name)
+      let group = parent.commands.find((command) => command.name() === name)
       if (!group) {
         group = create(name)
-        group.action(() => { throw new UsageError(`usage: crispctl ${name} <${group!.commands.map(command => command.name()).join("|")}>`) })
+        group.action(() => {
+          throw new UsageError(
+            `usage: crispctl ${name} <${group!.commands.map((command) => command.name()).join("|")}>`,
+          )
+        })
         parent.addCommand(group)
       }
       parent = group
@@ -97,14 +180,24 @@ export function createCommandTree() {
   root.addHelpText("after", `\n${ROOT_NOTES}`)
   root.configureHelp({
     showGlobalOptions: true,
-    visibleCommands(command) { return command === root ? leaves : Help.prototype.visibleCommands.call(this, command) },
+    visibleCommands(command) {
+      return command === root ? leaves : Help.prototype.visibleCommands.call(this, command)
+    },
     subcommandTerm(command) {
       const prefix = command.parent && command.parent !== root ? `${command.parent.name()} ` : ""
       return prefix + Help.prototype.subcommandTerm.call(this, command)
     },
   })
 
-  const flags = (): Flags => ({ json: false, help: false, version: false, readOnly: false, listEvents: false, unassign: false, ...root.opts<Partial<Flags>>() })
+  const flags = (): Flags => ({
+    json: false,
+    help: false,
+    version: false,
+    readOnly: false,
+    listEvents: false,
+    unassign: false,
+    ...root.opts<Partial<Flags>>(),
+  })
   return {
     flags,
     prepare(argv: string[]) {
@@ -112,9 +205,10 @@ export function createCommandTree() {
       // safer spelling: use --text=--literal when a value begins with two dashes.
       for (let index = 0; index < argv.length; index++) {
         if (argv[index] === "--") break
-        const option = optionDefinitions.find(option => option.long === argv[index])
+        const option = optionDefinitions.find((candidate) => candidate.long === argv[index])
         if (option?.required) {
-          if (argv[index + 1]?.startsWith("--")) throw new UsageError(`${option.long} requires a value`)
+          if (argv[index + 1]?.startsWith("--"))
+            throw new UsageError(`${option.long} requires a value`)
           index++
         }
       }
@@ -123,22 +217,34 @@ export function createCommandTree() {
       const parsed = root.parseOptions(argv)
       if (parsed.unknown.length) throw new UsageError(`unknown flag: ${parsed.unknown[0]}`)
       const values = flags()
-      if (values.website !== undefined && values.websiteId !== undefined && values.website !== values.websiteId) {
+      if (
+        values.website !== undefined &&
+        values.websiteId !== undefined &&
+        values.website !== values.websiteId
+      ) {
         throw new UsageError("--website and --website-id disagree")
       }
-      seen = new Set(optionDefinitions.filter(option => root.getOptionValueSource(option.attributeName()) === "cli").map(option => option.name()))
+      seen = new Set(
+        optionDefinitions
+          .filter((option) => root.getOptionValueSource(option.attributeName()) === "cli")
+          .map((option) => option.name()),
+      )
       return { flags: values, positionals: parsed.operands }
     },
     help(path: readonly string[]): string {
       let command = root
       for (const name of path) {
-        const child = command.commands.find(child => child.name() === name)
+        const child = command.commands.find((candidate) => candidate.name() === name)
         if (!child) break
         command = child
       }
       // helpInformation excludes addHelpText, so use injected outputHelp capture.
       let text = ""
-      command.configureOutput({ writeOut: chunk => { text += chunk } })
+      command.configureOutput({
+        writeOut: (chunk) => {
+          text += chunk
+        },
+      })
       command.outputHelp()
       if (command === root && path.length) text += `\nUnknown command: ${path[0]}\n`
       return text
@@ -154,6 +260,8 @@ export function createCommandTree() {
 
 export function commandError(error: unknown): unknown {
   if (!(error instanceof CommanderError)) return error
-  const message = error.message.replace(/^error: /, "").replace(/^unknown command '(.*)'$/, "unknown command: $1")
+  const message = error.message
+    .replace(/^error: /, "")
+    .replace(/^unknown command '(.*)'$/, "unknown command: $1")
   return new UsageError(message)
 }

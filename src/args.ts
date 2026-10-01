@@ -30,7 +30,15 @@ export function websiteOverride(flags: Flags): string | undefined {
   return value ? value : undefined
 }
 
-export const GLOBAL_FLAGS = new Set(["json", "help", "version", "profile", "website", "website-id", "read-only"])
+export const GLOBAL_FLAGS = new Set([
+  "json",
+  "help",
+  "version",
+  "profile",
+  "website",
+  "website-id",
+  "read-only",
+])
 
 export function assertAllowedFlags(seen: Set<string>, allowed: readonly string[]): void {
   const ok = new Set<string>([...GLOBAL_FLAGS, ...allowed])

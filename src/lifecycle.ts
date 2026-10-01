@@ -13,7 +13,9 @@ export class RunLifecycle {
     if (external?.aborted) this.cancel()
   }
 
-  cancel = (): void => { this.controller.abort() }
+  cancel = (): void => {
+    this.controller.abort()
+  }
 
   handleSignals(): void {
     if (this.handlingSignals) return
@@ -34,7 +36,9 @@ export class RunLifecycle {
     return new CrispApiError(0, "timeout", "RTM listen deadline reached")
   }
 
-  clearDeadline(): void { clearTimeout(this.timer) }
+  clearDeadline(): void {
+    clearTimeout(this.timer)
+  }
 
   dispose(): void {
     this.clearDeadline()

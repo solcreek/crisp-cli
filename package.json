@@ -32,13 +32,17 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "verify": "npm run typecheck && npm test && npm run test:rtm && npm run test:package",
+    "verify": "npm run fmt:check && npm run lint && npm run typecheck && npm test && npm run test:rtm && npm run test:package",
     "test": "npm run build && c8 node --enable-source-maps --import tsx --test test/*.test.ts",
     "test:rtm": "npm run build && c8 --reports-dir=coverage/rtm --include=src/rtm*.ts --lines=100 --statements=100 --functions=100 --branches=95 node --enable-source-maps --import tsx --test test/rtm*.test.ts",
     "check:rtm-reference": "npm run build && node scripts/check-rtm-reference.mjs",
     "test:live": "npm run build && node --import tsx --test test/live/*.test.ts",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives",
+    "lint:fix": "oxlint --fix --deny-warnings --report-unused-disable-directives"
   },
   "dependencies": {
     "commander": "15.0.0",
@@ -48,6 +52,8 @@
   "devDependencies": {
     "@types/node": "^22.15.3",
     "c8": "^10.1.3",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
     "socket.io": "^4.8.4",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

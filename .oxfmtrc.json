@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "printWidth": 100,
+  "sortPackageJson": false,
+  "ignorePatterns": ["package-lock.json", "test/fixtures/rtm-reference.json"]
+}
