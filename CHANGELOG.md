@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+
 ### Changed
 
 - Use Commander for argument parsing, command routing and generated help while
@@ -97,7 +99,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Named authentication profiles, environment overrides, JSON output, and
   credential redaction in errors.
 
-[Unreleased]: https://github.com/solcreek/crisp-cli/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/solcreek/crisp-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/solcreek/crisp-cli/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/solcreek/crisp-cli/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/solcreek/crisp-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/solcreek/crisp-cli/compare/v0.1.0...v0.2.0
