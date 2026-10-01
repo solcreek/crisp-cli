@@ -13,12 +13,12 @@ export const usage = {
   read: "crispctl read <session>",
   peopleGet: "crispctl people get <id|email>",
   operatorsList: "crispctl operators list",
-  listen: "crispctl listen",
+  listen: "crispctl listen [--events <a,b>] [--session <id>] [--count <n>] [--timeout <seconds>]",
 } as const
 
-const globals = "Global flags: --json, --profile <name>, --website <id>"
+const globals = "Global flags: --json, --read-only, --profile <name>, --website <id>"
 
-export const ROOT_HELP = `crispctl — agent-friendly Crisp REST CLI
+export const ROOT_HELP = `crispctl — agent-friendly Crisp REST and RTM CLI
 
 Usage:
   crispctl [--json] [--profile <name>] [--website <id>] <command> [args]
@@ -40,7 +40,7 @@ Commands:
   read                     Mark the conversation read for the operator
   people get               Get a people profile by id or email
   operators list           List website operators
-  listen                   Stub. RTM is not implemented
+  listen                   Stream RTM events (automatically reconnects)
 
 Profiles:
   Named profiles live in the config file. "default" and "sandbox" are the usual names.
@@ -52,11 +52,12 @@ Environment (overrides the selected profile):
   CRISPCTL_KEY or CRISP_KEY
   CRISPCTL_WEBSITE_ID or CRISP_WEBSITE_ID
   CRISPCTL_TIER or CRISP_TIER
+  CRISPCTL_READ_ONLY       Set to 1 to reject all write operations
   CRISPCTL_CONFIG          Config file path (default: $XDG_CONFIG_HOME/crispctl/config.json)
 
 The token key is never printed. A config file written by crispctl is mode 0600.
 
-Sandbox: use the Cos Crisp sandbox website only. Never point crispctl at production Teachify.
+Development: use the Cos Crisp sandbox website. Production Teachify requires explicit authorization and --read-only.
 `
 
 const HELP: Record<string, string> = {
@@ -158,7 +159,14 @@ GET /v1/website/{website_id}/operators/list
 `,
   listen: `${usage.listen}
 
-RTM listen is not implemented. See the command output for the website-tier connect-endpoints pitfall.
+Streams message:send, message:received and session:set_state by default.
+--events selects comma-separated RTM event names. --session filters locally.
+--json writes one {event,data,received_at} JSON object per line to stdout.
+Connection status goes to stderr. Ctrl-C stops cleanly; reconnects rediscover endpoints.
+--count stops after N matching events. --timeout sets a total deadline (exit 1).
+Only the selected website is subscribed. Events missed while disconnected are not replayed.
+--read-only (or CRISPCTL_READ_ONLY=1) rejects writes, including auth set.
+listen itself is always read-only.
 `,
 }
 

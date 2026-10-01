@@ -1,27 +1,158 @@
-export const SDK_WEBSITE_TIER_CONNECT_PATH = "/v1/website/connect/endpoints"
+import { io, type Socket } from "socket.io-client"
+import { setTimeout as delay } from "node:timers/promises"
+import type { CrispClient, ClientCredentials } from "./client.js"
+import { CrispApiError, UsageError } from "./errors.js"
 
-export const PLUGIN_CONNECT_PATH = "/v1/plugin/connect/endpoints"
+export const DEFAULT_EVENTS = ["message:send", "message:received", "session:set_state"]
 
-export function connectEndpointsPath(tier: "website" | "plugin", websiteId: string): string {
-  if (tier === "plugin") {
-    return PLUGIN_CONNECT_PATH
-  }
-  return `/v1/website/${encodeURIComponent(websiteId)}/connect/endpoints`
+export type RtmEvent = { event: string; data: unknown; received_at: string }
+export type RtmStatus = { status: "authenticated" | "reconnecting"; website_id: string }
+export type SocketFactory = (url: string, options: Parameters<typeof io>[1]) => Socket
+export type ListenOptions = {
+  events: string[]
+  session?: string
+  count?: number
+  signal: AbortSignal
+  onEvent: (event: RtmEvent) => void
+  onStatus: (status: RtmStatus) => void
+  socketFactory?: SocketFactory
+  reconnectDelayMs?: number
+  connectionTimeoutMs?: number
 }
 
-export function listenStubMessage(websiteId?: string): string {
-  const correct = websiteId
-    ? connectEndpointsPath("website", websiteId)
-    : "/v1/website/{website_id}/connect/endpoints"
-  return [
-    "listen is not implemented (RTM is a follow-up).",
-    "",
-    "Website-tier pitfall: the official crisp-api Node SDK requests",
-    `GET ${SDK_WEBSITE_TIER_CONNECT_PATH}`,
-    "when the token tier is \"website\". That call omits website_id and does not work.",
-    `The correct website route is GET ${correct}.`,
-    `Plugin tier uses GET ${PLUGIN_CONNECT_PATH}, which the SDK does call.`,
-    "",
-    "Use the Cos Sandbox website only. Never point listen at production Teachify.",
-  ].join("\n")
+export function parseEvents(raw?: string): string[] {
+  if (raw === undefined) return [...DEFAULT_EVENTS]
+  const events = [...new Set(raw.split(",").map(value => value.trim()))]
+  if (events.some(event => !/^[a-z][a-z0-9_]*(?::[a-z][a-z0-9_]*)+$/.test(event))) {
+    throw new UsageError("--events must contain comma-separated RTM event names (for example message:send)")
+  }
+  return events
+}
+
+export function positiveInteger(raw: string | undefined, flag: string): number | undefined {
+  if (raw === undefined) return undefined
+  const value = Number(raw)
+  if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(value)) {
+    throw new UsageError(`--${flag} must be a positive integer`)
+  }
+  return value
+}
+
+export function socketEndpoint(data: unknown): URL {
+  const app = (data as { socket?: { app?: unknown } } | null)?.socket?.app
+  let endpoint: URL
+  try {
+    if (typeof app !== "string") throw new Error()
+    endpoint = new URL(app)
+    if (endpoint.protocol !== "wss:" || endpoint.username || endpoint.password || endpoint.hash) throw new Error()
+  } catch {
+    throw new CrispApiError(200, "invalid_endpoint", "Crisp did not return a valid secure RTM socket.app endpoint")
+  }
+  return endpoint
+}
+
+// A new discovery request precedes every connection attempt, including reconnects.
+// Socket.IO's internal reconnect is disabled so it cannot reuse a stale endpoint.
+export async function listen(
+  client: Pick<CrispClient, "getConnectEndpoints">,
+  creds: ClientCredentials,
+  options: ListenOptions,
+): Promise<void> {
+  let received = 0
+  let failures = 0
+  while (!options.signal.aborted) {
+    try {
+      const endpoint = socketEndpoint(await client.getConnectEndpoints(options.signal))
+      if (options.signal.aborted) break
+      const result = await connection(endpoint, creds, options, event => {
+        options.onEvent(event)
+        received++
+        return options.count !== undefined && received >= options.count
+      })
+      if (result === "done") return
+      if (result === "connected") failures = 0
+    } catch (error) {
+      if (options.signal.aborted) break
+      if (!(error instanceof CrispApiError) ||
+          ![0, 429, 500, 502, 503, 504].includes(error.status)) throw error
+    }
+    if (options.signal.aborted) break
+    options.onStatus({ status: "reconnecting", website_id: creds.websiteId })
+    const backoff = Math.min((options.reconnectDelayMs ?? 1000) * 2 ** Math.min(failures++, 5), 30_000)
+    try {
+      await delay(backoff, undefined, { signal: options.signal })
+    } catch {
+      // Cancellation ends the loop and tears down the current connection.
+    }
+  }
+}
+
+function connection(
+  endpoint: URL,
+  creds: ClientCredentials,
+  options: ListenOptions,
+  onEvent: (event: RtmEvent) => boolean,
+): Promise<"done" | "connected" | "retry"> {
+  return new Promise((resolve, reject) => {
+    const socket = (options.socketFactory ?? io)(endpoint.origin, {
+      path: endpoint.pathname,
+      query: Object.fromEntries(endpoint.searchParams),
+      transports: ["websocket"],
+      autoConnect: false,
+      reconnection: false,
+      forceNew: true,
+      timeout: options.connectionTimeoutMs ?? 15_000,
+    })
+    let authenticated = false
+    let settled = false
+    const timer = setTimeout(() => finish("retry"), options.connectionTimeoutMs ?? 15_000)
+    const abort = () => finish("done")
+    function finish(result: "done" | "connected" | "retry", error?: Error): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      options.signal.removeEventListener("abort", abort)
+      socket.removeAllListeners()
+      socket.disconnect()
+      if (error) reject(error)
+      else resolve(result)
+    }
+    options.signal.addEventListener("abort", abort, { once: true })
+    socket.on("connect", () => {
+      socket.emit("authentication", {
+        tier: creds.tier,
+        username: creds.identifier,
+        password: creds.key,
+        events: options.events,
+        rooms: [creds.websiteId],
+      })
+    })
+    socket.on("authenticated", () => {
+      authenticated = true
+      clearTimeout(timer)
+      try {
+        options.onStatus({ status: "authenticated", website_id: creds.websiteId })
+      } catch (error) {
+        finish("done", error as Error)
+      }
+    })
+    socket.on("unauthorized", () => finish("done", new CrispApiError(401, "unauthorized", "RTM authentication rejected; check token tier, scopes and website access")))
+    socket.on("connect_error", () => finish("retry"))
+    socket.on("disconnect", () => finish(authenticated ? "connected" : "retry"))
+    for (const event of options.events) {
+      socket.on(event, (data: unknown) => {
+        if (!authenticated || !data || typeof data !== "object") return
+        const payload = data as { website_id?: unknown; session_id?: unknown }
+        if (payload.website_id !== creds.websiteId) return
+        if (options.session && payload.session_id !== options.session) return
+        try {
+          if (onEvent({ event, data, received_at: new Date().toISOString() })) finish("done")
+        } catch (error) {
+          finish("done", error as Error)
+        }
+      })
+    }
+    if (options.signal.aborted) abort()
+    else socket.connect()
+  })
 }
