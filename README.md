@@ -212,7 +212,7 @@ expose a previously used key in diagnostics. REST requests and response bodies
 honor cancellation, including SIGINT/SIGTERM in the executable. Cancellation
 prevents subsequent requests; a write already sent to Crisp may have taken effect.
 
-`npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM coverage gate and
+`npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM and release-tooling coverage gates and
 `test:package`. The package smoke installs an actual tarball into a temporary
 directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
@@ -229,6 +229,13 @@ It may download dependencies from npm; it never accesses Crisp or 1Password.
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
 Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and runs on both CI Node versions. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
+
+The registry, installed-package and published-package verification helpers also
+use TypeScript `checkJs` with JSDoc contracts. `npm run test:tooling` exercises them
+with offline subprocess fixtures and enforces **95% lines/statements, 100%
+functions and 90% branches** independently of `src/` coverage. Cases include
+installation failure, wrong executable versions, malformed or inconsistent event
+catalogs, invalid exit codes, credential isolation and temporary-directory cleanup.
 
 ### Live smoke
 

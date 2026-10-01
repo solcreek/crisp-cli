@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Type-check the registry and installed-package verification scripts, enforce
+  their coverage separately, and test installation and executable contract failures
+  using offline fixtures.
 - Verify published npm versions with bounded registry polling and an installed
   executable smoke test; allow verification-only reruns without republishing.
 

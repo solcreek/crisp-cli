@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises"
 
+/** @param {string} version */
 export function assertReleaseVersion(version) {
   const match =
     /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
@@ -16,8 +17,21 @@ export function assertReleaseVersion(version) {
   }
 }
 
+/**
+ * @typedef {{check: string, version: string, attempts: number, status?: number | string}} RegistryCheck
+ * @typedef {object} RegistryOptions
+ * @property {number} [timeoutMs]
+ * @property {number} [intervalMs]
+ * @property {number} [requestTimeoutMs]
+ * @property {typeof fetch} [fetchMetadata]
+ * @property {() => number} [now]
+ * @property {(ms: number) => Promise<void>} [sleep]
+ * @property {(check: RegistryCheck) => void} [report]
+ */
+
 // npm accepting a publication does not guarantee immediate registry visibility.
 // Retry reads only; this helper never publishes or changes dist-tags.
+/** @param {string} version @param {RegistryOptions} [options] */
 export async function waitForPublishedVersion(
   version,
   {
