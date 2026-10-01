@@ -24,7 +24,7 @@ See the [crisp-tui README](https://github.com/solcreek/crisp-tui#readme) for ins
 
 ## Live access
 
-Use the **Cos Crisp sandbox** website for development and write tests. Production **Teachify** access requires explicit authorization and must use `--read-only` or `CRISPCTL_READ_ONLY=1`. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
+Use a dedicated test website for development and write tests. Access to production websites requires explicit authorization and must use `--read-only` or `CRISPCTL_READ_ONLY=1`. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
 
 ## Install
 
