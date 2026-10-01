@@ -21,6 +21,28 @@ test("Retry-After seconds and HTTP dates are a minimum, including delays beyond 
   ] as const) assert.equal(retryDelay(0, 1000, 1, now, header), expected, header)
 })
 
+test("malformed or normalized Retry-After dates fall back to jittered backoff", () => {
+  const now = Date.parse("Thu, 01 Oct 2026 12:00:00 GMT")
+  for (const header of [
+    "Thu, 01 Oct 3000", // Review regression: Date.parse accepts missing time/GMT.
+    "Thu, 01 Oct 3000 12:00:00", "Thu, 01 Oct 2026 12:01:00 UTC",
+    "Thu, 01 Oct 2026 12:01:00 +0000", "Thu, 1 Oct 2026 12:01:00 GMT",
+    "thu, 01 Oct 2026 12:01:00 GMT", "Thu, 01 Oct 2026 12:01 GMT",
+    "Thu, 01 Oct 2026 12:01:00 GMT trailing", "Fri, 01 Oct 2026 12:01:00 GMT",
+    "Mon, 29 Feb 2027 12:00:00 GMT", "Sat, 31 Apr 2027 12:00:00 GMT",
+    "Thu, 01 Oct 2026 24:00:00 GMT", "Thu, 01 Oct 2026 12:60:00 GMT",
+    "Thu, 01 Oct 2026 12:00:61 GMT", "Thu, 00 Oct 2026 12:00:00 GMT",
+    "Thu, 01 Xxx 2026 12:00:00 GMT", "Thu, 01 Oct 10000 12:00:00 GMT",
+  ]) assert.equal(retryDelay(2, 1000, 0.5, now, header), 3000, header)
+})
+
+test("canonical leap-day and distant future Retry-After dates remain valid", () => {
+  const now = Date.parse("Thu, 01 Oct 2026 12:00:00 GMT")
+  for (const header of ["Tue, 29 Feb 2028 12:00:00 GMT", "Tue, 01 Jan 2030 00:00:00 GMT"]) {
+    assert.equal(retryDelay(0, 1000, 1, now, ` ${header} `), Date.parse(header) - now)
+  }
+})
+
 test("long waits are chunked within Node timer limits and remain abortable", async () => {
   const controller = new AbortController()
   const delays: number[] = []

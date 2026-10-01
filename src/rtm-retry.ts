@@ -13,8 +13,16 @@ export function retryDelay(failures: number, baseMs: number, random: number, now
   if (retryAfter === undefined) return backoff
   const value = retryAfter.trim()
   const requested = /^\d+$/.test(value) ? Number(value) * 1000
-    : /^[A-Za-z]{3}, /.test(value) ? Date.parse(value) - now : NaN
+    : canonicalHttpDate(value) - now
   return Number.isFinite(requested) ? Math.max(backoff, requested) : backoff
+}
+
+function canonicalHttpDate(value: string): number {
+  // Date.parse also accepts incomplete dates and normalizes impossible days.
+  // Require IMF-fixdate syntax, then round-trip to validate the calendar/weekday.
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value)) return NaN
+  const timestamp = Date.parse(value)
+  return new Date(timestamp).toUTCString() === value ? timestamp : NaN
 }
 
 // Node timers overflow above this value. Long server delays must not retry early.

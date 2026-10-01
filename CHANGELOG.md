@@ -21,6 +21,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Reject malformed `Retry-After` dates, including incomplete timestamps, invalid
+  calendar values and weekday mismatches, instead of scheduling excessive waits.
 - Hide captured credential output when the live smoke's 1Password lookup fails.
 - Honor discovery `Retry-After` headers, add jitter to reconnect delays, and keep
   long retry waits cancellable without overflowing Node timers.

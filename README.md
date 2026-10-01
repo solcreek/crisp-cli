@@ -122,7 +122,7 @@ The default events are `message:send`, `message:received`, and `session:set_stat
 {"event":"session:set_state","data":{"website_id":"...","session_id":"session_...","state":"resolved"},"received_at":"2026-10-01T12:00:00.000Z"}
 ```
 
-Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff and equal jitter, capped at 30 seconds. A valid HTTP `Retry-After` (seconds or HTTP date) is honored as a minimum and may exceed that cap; all waits remain cancellable. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
+Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff and equal jitter, capped at 30 seconds. A valid HTTP `Retry-After` (seconds or a canonical IMF-fixdate timestamp) is honored as a minimum and may exceed that cap; all waits remain cancellable. Incomplete dates, invalid calendar values and weekday mismatches fall back to the jittered backoff. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
 
 Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits successfully after N matching events; `--timeout S` sets a total deadline in seconds and exits 1 if reached. Without these flags, the listener runs until stopped.
 
