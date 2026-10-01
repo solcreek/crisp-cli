@@ -261,7 +261,7 @@ for (const mode of ["read", "rename", "cleanup"]) {
     const result = await promisify(execFile)(
       process.execPath,
       [fileURLToPath(new URL("./fixtures/config-faults.mjs", import.meta.url)), mode],
-      { timeout: 5000, env: {} },
+      { timeout: 5000, env: { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE } },
     )
     assert.equal(result.stdout, "")
     assert.equal(result.stderr, "")
