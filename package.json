@@ -32,6 +32,7 @@
   ],
   "scripts": {
     "bench": "node scripts/build.mjs && node scripts/benchmark.mjs",
+    "bench:stages": "node scripts/build.mjs && node scripts/benchmark-stages.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json",
     "verify": "npm run fmt:check && npm run lint && npm run typecheck && npm test && npm run coverage:rtm && npm run coverage:tooling && node scripts/package-smoke.mjs",

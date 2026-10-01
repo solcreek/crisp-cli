@@ -31,6 +31,11 @@ Run on macOS or Linux with loopback listening permitted.
 
 ## What is measured
 
+Additional scenarios cover `auth-file` (synthetic stored credentials),
+`invalid-page`, `read-only-write`, and `rest-error` (HTTP 429 with Retry-After).
+There are now 16 scenarios. A contract failure identifies the scenario and exit
+status without echoing its payload.
+
 | Scenario                         | Contract checked                                                                      |
 | -------------------------------- | ------------------------------------------------------------------------------------- |
 | `node-baseline`                  | Empty Node process using the same resource instrumentation                            |
@@ -93,6 +98,30 @@ retain command correctness, redaction and cancellation tests when optimizing.
 For CLI scripting DX, usage-error latency, deterministic JSON, complete output and
 prompt cancellation are as relevant as help startup. Build and test-suite duration
 are separate developer workflows and are not included in these CLI timings.
+
+## Comparing builds and component costs
+
+Build both checkouts first, then use the same benchmark driver and Node executable:
+
+```bash
+node scripts/benchmark.mjs --target /path/to/baseline --json > /tmp/before.json
+node scripts/benchmark.mjs --target /path/to/candidate --json > /tmp/after.json
+npm run --silent bench:stages > /tmp/stages.json
+node scripts/benchmark-stages.mjs --target /path/to/baseline > /tmp/stages-before.json
+```
+
+`--target` selects the built CLI and its package/Git metadata. Fixtures remain
+owned by the driver, so both builds receive the same synthetic workload. Paths are
+not included in reports. A build outside Git reports a null revision.
+
+Component benchmarks use 20 samples and three warmups by default (`--samples` is
+configurable). Each time is for the **whole named batch**, including validation:
+100 command trees; 100 tree constructions plus argument parsing; 100 config reads;
+1,000 credential snapshot lookups; a roughly 1 MiB streamed body, decode or JSON
+output; 1,000 redacted events; and a 50,000-record output queue with asynchronous
+write callbacks. Assertions and fixture construction contribute to these numbers.
+They locate repeatable costs but are not additive phases of an end-to-end request.
+Run these separately from process benchmarks and tests to avoid CPU contention.
 
 ## Baseline: 2026-10-01
 

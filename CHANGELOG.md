@@ -7,6 +7,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Compare built checkouts with the same benchmark fixtures, including stored
+  configuration, read-only rejection and HTTP errors; measure warm command,
+  configuration, response, redaction and output-queue batches separately.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added
