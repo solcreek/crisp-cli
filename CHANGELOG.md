@@ -19,6 +19,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Coordinate garbage-collection cancellation regressions with response-body
+  progress, and verify that cancellation closes the underlying HTTP transport.
+
 - Type-check command names, option names and help-note completeness from shared
   metadata, with help verification for every command.
 - Build and run the full offline suite once per verification, reusing coverage
