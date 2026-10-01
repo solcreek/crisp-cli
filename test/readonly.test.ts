@@ -46,3 +46,23 @@ test("read-only CLI permits reads and help", async () => {
     })
   } finally { removeHome(env) }
 })
+
+test("operation layer rejects writes even when bypassing command routing", async () => {
+  const { parseArgv } = await import("../src/args.js")
+  const ops = await import("../src/operations.js")
+  for (const mode of ["flag", "env"]) {
+    const flags = parseArgv(mode === "flag" ? ["--read-only"] : []).flags
+    const io = { ...buffers(), flags, env: mode === "env" ? { CRISPCTL_READ_ONLY: "1" } : {} }
+    const seen = new Set<string>()
+    for (const invoke of [
+      () => ops.authCommand("set", [], seen, io),
+      () => ops.replyCommand(undefined, [], seen, io),
+      () => ops.stateCommand("resolved", undefined, [], seen, io),
+      () => ops.assignCommand(undefined, [], seen, io),
+      () => ops.segmentsCommand(undefined, [], seen, io),
+      () => ops.readCommand(undefined, [], seen, io),
+    ]) await assert.rejects(async () => invoke(), /read-only mode/)
+    assert.equal(io.out(), "")
+    assert.equal(io.err(), "")
+  }
+})
