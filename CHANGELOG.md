@@ -15,6 +15,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Clean build output before compiling and suppress output on type errors, so npm
+  packages cannot retain deleted modules or artifacts from failed builds.
 - Reject page numbers outside JavaScript’s safe integer range instead of rounding
   or sending `Infinity`; share numeric validation with RTM count and timeout flags.
 - Keep the credentials used by each invocation available for redaction even if
