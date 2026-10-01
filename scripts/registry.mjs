@@ -1,10 +1,16 @@
 import { setTimeout as delay } from "node:timers/promises"
 
 export function assertReleaseVersion(version) {
-  if (
-    !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
+  const match =
+    /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
       version,
     )
+  // SemVer 2.0.0 section 9: numeric prerelease identifiers cannot have leading
+  // zeroes; identifiers containing letters or hyphens may start with zeroes.
+  if (
+    !match ||
+    match[0] !== version ||
+    match[1]?.split(".").some((identifier) => /^0\d+$/.test(identifier))
   ) {
     throw new Error("Expected an exact release version, for example 0.4.0")
   }

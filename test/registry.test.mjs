@@ -45,7 +45,17 @@ function simulated(replies, extra = {}) {
 }
 
 test("release verification only accepts exact versions before any registry access", async () => {
-  for (const value of ["0.4.0", "1.0.0-rc.1"])
+  for (const value of [
+    "0.4.0",
+    "1.0.0-rc.1",
+    "1.0.0-0",
+    "1.0.0-0.3.7",
+    "1.0.0-10",
+    "1.0.0-01alpha",
+    "1.0.0-alpha01",
+    "1.0.0-01-alpha",
+    "1.0.0-x-y-z.--",
+  ])
     assert.doesNotThrow(() => assertReleaseVersion(value))
   for (const value of [
     "latest",
@@ -56,13 +66,30 @@ test("release verification only accepts exact versions before any registry acces
     "--help",
     "https://example.test",
     "0.4.0;false",
+    "1.0.0-01",
+    "1.0.0-00",
+    "1.0.0-rc.01",
+    "1.0.0-01.rc",
+    "1.0.0-alpha.1.00",
+    "1.0.0-",
+    "1.0.0-rc..1",
+    "1.0.0\n",
+    "1.0.0-rc.1\n",
   ]) {
+    assert.throws(() => assertReleaseVersion(value), /exact release version/, value)
+    let requests = 0
     await assert.rejects(
       waitForPublishedVersion(value, {
-        fetchMetadata: () => assert.fail("unexpected network access"),
+        timeoutMs: 10,
+        intervalMs: 1,
+        fetchMetadata: async () => {
+          requests++
+          return new Response(null, { status: 404 })
+        },
       }),
       /exact release version/,
     )
+    assert.equal(requests, 0, value)
   }
 })
 
@@ -144,15 +171,28 @@ test("registry deadline aborts a stalled real HTTP response body", async () => {
 })
 
 test("published smoke rejects invalid versions as structured errors", () => {
-  const child = spawnSync(process.execPath, ["scripts/published-smoke.mjs", "latest"], {
-    encoding: "utf8",
-    timeout: 5000,
-  })
-  assert.ifError(child.error)
-  assert.equal(child.status, 1)
-  assert.equal(child.stdout, "")
-  assert.equal(JSON.parse(child.stderr).passed, false)
-  assert.match(JSON.parse(child.stderr).message, /exact release version/)
+  for (const value of ["latest", "1.0.0-01", "1.0.0-rc.01"]) {
+    const child = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "./test/fixtures/mock-published-smoke.mjs",
+        "scripts/published-smoke.mjs",
+        value,
+      ],
+      {
+        encoding: "utf8",
+        timeout: 5000,
+      },
+    )
+    assert.ifError(child.error)
+    assert.equal(child.status, 1)
+    assert.equal(child.stdout, "")
+    const failure = JSON.parse(child.stderr)
+    assert.equal(failure.version, value)
+    assert.equal(failure.passed, false)
+    assert.match(failure.message, /exact release version/)
+  }
 })
 
 test("published smoke hides npm subprocess output when installation fails", () => {
