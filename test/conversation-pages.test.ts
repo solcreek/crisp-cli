@@ -34,6 +34,8 @@ test("live history validation accepts empty history and omitted optional fields"
     { page_url: "https://example.test/" },
     { page_referrer: "https://example.test/help" },
     { timestamp: 0 },
+    { timestamp: 1 },
+    { timestamp: 2 ** 64 - 2048 },
     { future_field: { value: true } },
   ])
 })
@@ -50,7 +52,19 @@ test("live history validation checks optional fields when present", () => {
       assert.throws(() => assertConversationPages([{ [field]: value }]), assert.AssertionError)
     }
   }
-  for (const timestamp of [null, "1790812800000", false, {}, [], NaN, Infinity, -Infinity]) {
+  for (const timestamp of [
+    null,
+    "1790812800000",
+    false,
+    {},
+    [],
+    NaN,
+    Infinity,
+    -Infinity,
+    -1,
+    1.5,
+    2 ** 64,
+  ]) {
     assert.throws(() => assertConversationPages([{ timestamp }]), assert.AssertionError)
   }
 })

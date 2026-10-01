@@ -15,7 +15,10 @@ export function assertConversationPages(pages: unknown): void {
     }
     if (page.timestamp !== undefined) {
       assert.equal(typeof page.timestamp, "number", "timestamp should be a number")
-      assert.ok(Number.isFinite(page.timestamp), "timestamp should be finite")
+      assert.ok(
+        Number.isInteger(page.timestamp) && page.timestamp >= 0 && page.timestamp < 2 ** 64,
+        "timestamp should be a non-negative integer in the uint64 range",
+      )
     }
   }
 }
