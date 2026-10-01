@@ -254,5 +254,5 @@ test("package.json is publishable as crispctl", () => {
   assert.equal(pkg.bin.crispctl, "./dist/index.js")
   assert.equal(pkg.license, "MIT")
   assert.equal(pkg.type, "module")
-  assert.equal(pkg.engines.node, ">=20")
+  assert.equal(pkg.engines.node, ">=22.12.0")
 })

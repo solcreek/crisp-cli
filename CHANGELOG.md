@@ -7,6 +7,15 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Use Commander for argument parsing, command routing and generated help while
+  retaining JSON output, exit codes and flexible option placement.
+- Separate command operations from CLI routing and enforce read-only mode directly
+  in every write operation, including local credential changes.
+- Require Node.js 22.12 or newer for Commander 15; verify Node 22 and 24 before
+  publishing.
+
 ### Fixed
 
 - Redact credentials from API error reasons and Retry-After values as well as
