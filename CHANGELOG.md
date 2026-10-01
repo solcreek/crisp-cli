@@ -9,6 +9,10 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add an offline CLI benchmark for startup, first output, REST output size and
+  backpressure, RTM bursts, memory/CPU usage and graceful cancellation, with
+  validated samples and machine-readable percentile reports.
+
 - Add a separately opted-in sandbox write check for synthetic notes, RTM delivery,
   state readback, API errors and cleanup after verifying the website identity.
 

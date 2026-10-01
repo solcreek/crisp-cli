@@ -26,6 +26,7 @@ try {
     "dist/context.d.ts",
     "dist/rtm-events.js",
     "docs/rtm-coverage.md",
+    "docs/performance.md",
     "CHANGELOG.md",
     "LICENSE",
   ]) {
