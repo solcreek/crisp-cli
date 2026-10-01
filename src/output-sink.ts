@@ -16,6 +16,7 @@ export class OutputError extends Error {
 // Socket.IO cannot pause the remote publisher, so excess queued output is fatal.
 export class OutputSink {
   private queue: string[] = []
+  private head = 0
   private bytes = 0
   private active = false
   private failure?: Error
@@ -44,6 +45,7 @@ export class OutputSink {
     if (this.failure) return
     this.failure = error
     this.queue = []
+    this.head = 0
     this.bytes = 0
     this.stream.destroy()
     this.stop()
@@ -69,10 +71,20 @@ export class OutputSink {
 
   private pump(): void {
     if (this.active || this.failure) return
-    const chunk = this.queue.shift()
+    const chunk = this.queue[this.head]
     if (chunk === undefined) {
       this.wake()
       return
+    }
+    // Release consumed strings immediately; compact only after enough progress.
+    // Repeated shift() moves a large pending burst on every completed write.
+    this.queue[this.head++] = ""
+    if (this.head === this.queue.length) {
+      this.queue = []
+      this.head = 0
+    } else if (this.head >= 1024 && this.head * 2 >= this.queue.length) {
+      this.queue = this.queue.slice(this.head)
+      this.head = 0
     }
     this.active = true
     this.stream.write(chunk, (error) => {

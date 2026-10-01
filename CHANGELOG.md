@@ -15,6 +15,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Drain large output bursts using a bounded, compacting queue cursor while
+  preserving byte limits, ordering, cancellation and backpressure handling.
+
 - Compile credential-redaction patterns once per JSON serialization instead of
   once per property and string, keeping secret snapshots isolated.
 
