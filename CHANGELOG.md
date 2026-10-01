@@ -7,6 +7,32 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Optional `CRISPCTL_LIVE_RTM_MODE=auth` smoke verification for quiet websites;
+  event-delivery verification remains the default and reports its mode explicitly.
+
+### Changed
+
+- Extend WSS E2E coverage with independent representative payload fixtures and
+  malformed routing fields, alongside the full event namespace matrix.
+- Require shared Node 20/24 verification before publishing, including typecheck,
+  both coverage gates and a smoke test of the installed npm tarball.
+
+### Fixed
+
+- Reject malformed `Retry-After` dates, including incomplete timestamps, invalid
+  calendar values and weekday mismatches, instead of scheduling excessive waits.
+- Hide captured credential output when the live smoke's 1Password lookup fails.
+- Honor discovery `Retry-After` headers, add jitter to reconnect delays, and keep
+  long retry waits cancellable without overflowing Node timers.
+- Normalize network failures while reading HTTP response bodies so RTM endpoint
+  discovery reconnects after a partial-response disconnect, preserving known HTTP
+  error statuses and retry hints when headers have already arrived.
+- Handle closed stdout pipes without an uncaught EPIPE, drain queued output before
+  exit, and stop RTM with an explicit error when a slow consumer exceeds the 8 MiB
+  output buffer limit.
+
 ## [0.3.0] - 2026-10-01
 
 ### Added

@@ -4,6 +4,7 @@ import { MockAgent } from "undici"
 import { CrispClient } from "../src/client.js"
 import { CrispApiError } from "../src/errors.js"
 import { FIXTURE, okEnvelope, withCrispMock } from "./support.js"
+import { BodyDispatcher } from "./body-dispatcher.js"
 
 function client(dispatcher?: ConstructorParameters<typeof CrispClient>[1]): CrispClient {
   return new CrispClient(
@@ -148,4 +149,38 @@ test("session ids are encoded as a single path segment", async () => {
     await client(dispatcher).getConversation("a/b")
   })
   assert.equal(calls[0]?.path, `/v1/website/${FIXTURE.websiteId}/conversation/${encodeURIComponent("a/b")}`)
+})
+
+test("connection reset after headers is normalized as a retriable network error", async () => {
+  const dispatcher = new BodyDispatcher(handler => {
+    handler.onData!(Buffer.from('{"data":'))
+    setImmediate(() => handler.onError!(new Error("simulated reset")))
+  })
+  await assert.rejects(client(dispatcher).getConnectEndpoints(), { name: "CrispApiError", status: 0, reason: "network_error" })
+})
+
+test("cancellation and caller deadline interrupt an in-progress response body", async () => {
+  for (const deadline of [false, true]) {
+    const controller = new AbortController()
+    const dispatcher = new BodyDispatcher(handler => {
+      handler.onData!(Buffer.from('{"data":'))
+      if (!deadline) setImmediate(() => controller.abort())
+    })
+    // Keep the test alive while AbortSignal.timeout's unref'ed timer expires.
+    const keepAlive = setTimeout(() => {}, 1000)
+    try {
+      await assert.rejects(client(dispatcher).getConnectEndpoints(deadline ? AbortSignal.timeout(10) : controller.signal),
+        { name: "CrispApiError", status: 0, reason: "network_error" })
+    } finally { clearTimeout(keepAlive) }
+  }
+})
+
+test("body resets preserve error status and Retry-After already received in headers", async () => {
+  for (const [status, reason] of [[401, "unauthorized"], [403, "unauthorized"], [429, "rate_limited"], [503, "http_error"]] as const) {
+    const dispatcher = new BodyDispatcher(handler => {
+      handler.onData!(Buffer.from('{"data":'))
+      setImmediate(() => handler.onError!(new Error("body reset")))
+    }, status)
+    await assert.rejects(client(dispatcher).getConnectEndpoints(), { name: "CrispApiError", status, reason, retryAfter: "2" })
+  }
 })

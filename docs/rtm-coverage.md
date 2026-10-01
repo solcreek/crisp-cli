@@ -17,6 +17,10 @@ eligible event over a real local WSS Socket.IO connection for each token tier.
 Data is synthetic, using documented routing-field locations; tests do not claim
 to validate every server payload variant or trigger every event on real Crisp.
 
+Independent hand-authored fixtures also cover text/file messages, bucket URLs,
+email tracking and plugin payloads over WSS. Malformed and cross-website routing
+fields are rejected; optional/unknown fields and nested content are preserved.
+
 `listen --list-events --json` exposes the catalog and documented scopes. Unknown,
 syntactically valid names remain accepted to permit future Crisp events, with
 website isolation still enforced. Known incompatible tiers fail before network
@@ -121,6 +125,11 @@ authentication failure, startup timeout, transient and fatal discovery errors,
 cancellation during discovery and connection setup, SIGTERM cleanup, and NDJSON
 output. The RTM coverage gate enforces 100% lines/statements/functions and 95%
 branches across `src/rtm*.ts` independently of the overall CLI threshold.
+
+Failure tests include HTTP body resets, closed/slow stdout consumers, bounded
+output overflow, deterministic retry delays and resource cleanup after 100
+reconnects. These tests establish behavior under injected faults, not a production
+uptime or lossless-delivery guarantee.
 
 The default subscription remains three events, not the whole catalog. Live smoke
 has confirmed website-token authentication and real session availability and

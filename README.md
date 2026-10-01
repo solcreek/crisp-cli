@@ -122,9 +122,15 @@ The default events are `message:send`, `message:received`, and `session:set_stat
 {"event":"session:set_state","data":{"website_id":"...","session_id":"session_...","state":"resolved"},"received_at":"2026-10-01T12:00:00.000Z"}
 ```
 
-Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff capped at 30 seconds. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
+Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff and equal jitter, capped at 30 seconds. A valid HTTP `Retry-After` (seconds or a canonical IMF-fixdate timestamp) is honored as a minimum and may exceed that cap; all waits remain cancellable. Incomplete dates, invalid calendar values and weekday mismatches fall back to the jittered backoff. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
 
 Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits successfully after N matching events; `--timeout S` sets a total deadline in seconds and exits 1 if reached. Without these flags, the listener runs until stopped.
+
+Output is written in order and drained before normal exit. Closing the stdout pipe
+(for example, a downstream reader stopping early) cancels listening cleanly.
+Pending output is limited to 8 MiB per stream; exceeding this limit stops the
+listener with exit 1 and an explicit error. Overflow can truncate pending output;
+it does not silently drop events and continue.
 
 ### Verify RTM with 1Password
 
@@ -144,9 +150,15 @@ Unit and HTTP contract tests use undici [`MockAgent`](https://undici.nodejs.org/
 ```bash
 npm test
 npm run typecheck
+npm run verify
 ```
 
 `npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 20 and 24. No Crisp credentials or external services are needed.
+
+`npm run verify` runs typecheck, offline tests, the RTM coverage gate and
+`test:package`. The package smoke installs an actual tarball into a temporary
+directory and checks its executable, version, help, event catalog and error exit.
+It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 | Layer | What it verifies | Included in CI |
 | --- | --- | --- |
@@ -154,6 +166,7 @@ npm run typecheck
 | HTTP integration | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors | Yes |
 | CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes |
 | Live smoke | Real Crisp REST or RTM, explicitly enabled locally | No |
+| Package smoke | Install the packed artifact and execute its installed bin | Yes |
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
@@ -165,6 +178,13 @@ Aggregate coverage is enforced across all `src/` files, including unimported fil
 
 - REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials (Cos Sandbox only).
 - RTM requires `CRISPCTL_LIVE_RTM=1`, an expected website name, and an authenticated `op` CLI. It reads `Crisp API Credentials` and requires receipt of an actual event within 60 seconds, not merely a successful handshake. It never sends messages or writes data.
+
+RTM defaults to `CRISPCTL_LIVE_RTM_MODE=event`. For a quiet website, set
+`CRISPCTL_LIVE_RTM_MODE=auth` to verify authentication and then disconnect without
+waiting for traffic. The result identifies the mode and event count; an auth-only
+pass does not establish event delivery. In event mode, no events within the
+deadline still fails. The outer watchdog allows time for 1Password authorization,
+website identity verification and the full event deadline.
 
 ```bash
 CRISPCTL_LIVE_RTM=1 CRISPCTL_LIVE_WEBSITE_NAME="<expected website name>" npm run test:live
@@ -193,9 +213,10 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 20 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 
-Pull requests run `.github/workflows/ci.yml` (install, typecheck, test, no live call).
+Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
+`.github/workflows/verify.yml` as releases. No live Crisp calls are included.
 
 ## License
 

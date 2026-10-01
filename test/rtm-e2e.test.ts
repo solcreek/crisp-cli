@@ -137,3 +137,96 @@ for (const tier of ["website", "plugin"] as const) {
     assert.equal(result.discoveries, 1)
   })
 }
+
+test("E2E closed stdout cancels RTM without an unhandled EPIPE", { timeout: 10_000 }, async t => {
+  let disconnected!: () => void
+  const closed = new Promise<void>(resolve => { disconnected = resolve })
+  const endpoint = await server(t, socket => {
+    socket.on("disconnect", disconnected)
+    socket.emit("authenticated")
+    socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "pipe closed" })
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--timeout", "5"])
+  child.stdout!.destroy()
+  const result = await completed
+  await closed
+  assert.equal(result.code, 0, result.stderr)
+  assert.doesNotMatch(result.stderr, /Unhandled|EPIPE|node:events/)
+})
+
+test("E2E slow stdout drains every ordered event before count exit", { timeout: 15_000 }, async t => {
+  const count = 150
+  const content = "保留".repeat(2048)
+  const endpoint = await server(t, socket => {
+    socket.emit("authenticated")
+    for (let sequence = 0; sequence < count; sequence++) {
+      socket.emit("message:send", { website_id: FIXTURE.websiteId, sequence, content })
+    }
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--count", String(count), "--timeout", "10"])
+  child.stdout!.pause()
+  const timer = setTimeout(() => child.stdout!.resume(), 300)
+  t.after(() => clearTimeout(timer))
+  const result = await completed
+  assert.equal(result.code, 0, result.stderr)
+  const events = result.stdout.trim().split("\n").map(line => JSON.parse(line))
+  assert.deepEqual(events.map(event => event.data.sequence), Array.from({ length: count }, (_, i) => i))
+  assert.ok(events.every(event => event.data.content === content))
+})
+
+test("E2E a stalled reader causes bounded-output failure and closes RTM", { timeout: 15_000 }, async t => {
+  let disconnected!: () => void
+  const closed = new Promise<void>(resolve => { disconnected = resolve })
+  const endpoint = await server(t, socket => {
+    socket.on("disconnect", disconnected)
+    socket.emit("authenticated")
+    for (let i = 0; i < 80; i++) socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "x".repeat(256 * 1024) })
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--timeout", "10"])
+  child.stdout!.pause()
+  let stderr = ""
+  child.stderr!.on("data", chunk => {
+    stderr += chunk
+    if (stderr.includes("buffer exceeded")) child.stdout!.resume()
+  })
+  const result = await completed
+  await closed
+  assert.equal(result.code, 1, stderr)
+  assert.match(stderr, /stdout buffer exceeded 8388608 bytes/)
+  assert.doesNotMatch(stderr, /Unhandled|node:events/)
+})
+
+for (const sessionFilter of [false, true]) {
+  test(`E2E independent payload fixtures preserve content with session filter ${sessionFilter}`, { timeout: 15_000 }, async t => {
+    const fixtures = JSON.parse(readFileSync(path("./fixtures/rtm-payloads.json"), "utf8")) as { event: string; data: Record<string, unknown> }[]
+    const expected = sessionFilter ? fixtures.filter(item => ["message:send", "message:received", "email:track:view"].includes(item.event)) : fixtures
+    const endpoint = await server(t, socket => {
+      socket.emit("authenticated")
+      for (const fixture of fixtures) {
+        for (const malformed of [null, [], "string", 42, {}, { website_id: 123 }, { website_id: { id: FIXTURE.websiteId } }]) {
+          socket.emit(fixture.event, malformed)
+        }
+        socket.emit(fixture.event, { ...fixture.data, website_id: "other-website" })
+      }
+      // Invalid nested routing fields and session types must not pass the filter.
+      for (const resource of [null, [], {}, { type: "website", id: 123 }, { type: "user", id: FIXTURE.websiteId }]) {
+        socket.emit("bucket:url:upload:generated", { resource, identifier: FIXTURE.websiteId })
+      }
+      if (sessionFilter) {
+        for (const session_id of [null, [], {}, 123, "other-session"]) {
+          socket.emit("message:send", { website_id: FIXTURE.websiteId, session_id })
+        }
+        socket.emit("email:track:view", { website_id: FIXTURE.websiteId, type: "campaign", identifier: FIXTURE.session })
+      }
+      if (sessionFilter) socket.emit("plugin:event", fixtures.find(item => item.event === "plugin:event")!.data)
+      for (const fixture of fixtures) socket.emit(fixture.event, fixture.data)
+    })
+    const result = await cli(t, endpoint, ["listen", "--json", "--events", fixtures.map(item => item.event).join(","),
+      "--count", String(expected.length), "--timeout", "10", ...(sessionFilter ? ["--session", FIXTURE.session] : [])]).completed
+    assert.equal(result.code, 0, result.stderr)
+    assert.deepEqual(result.stdout.trim().split("\n").map(line => {
+      const { event, data } = JSON.parse(line)
+      return { event, data }
+    }), expected)
+  })
+}

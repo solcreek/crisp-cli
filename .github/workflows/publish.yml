@@ -6,12 +6,18 @@ on:
       - 'v*'
 
 permissions:
-  id-token: write  # Required for OIDC
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC
     steps:
       - uses: actions/checkout@v6
 
@@ -23,6 +29,5 @@ jobs:
       - name: Check tag matches package.json version
         run: node -e "const version=require('./package.json').version; const tag=process.env.GITHUB_REF_NAME; if(tag!=='v'+version){console.error('GITHUB_REF_NAME '+JSON.stringify(tag)+' does not match package.json version '+version+' (expected v'+version+')'); process.exit(1)}"
       - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test
-      - run: npm publish  # Or: npm stage publish
+      - run: npm run build
+      - run: npm publish
