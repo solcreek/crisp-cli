@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 import { CrispClient } from "../src/client.js"
 import { run } from "../src/cli.js"
+import { assertConversationPages } from "./conversation-pages-assertions.js"
 import {
   buffers,
   credentialEnv,
@@ -23,6 +24,36 @@ const pages = [
   },
   { page_title: "", page_url: "https://example.test/", timestamp: 1790812700000 },
 ]
+
+test("live history validation accepts empty history and omitted optional fields", () => {
+  assertConversationPages([])
+  assertConversationPages(pages)
+  assertConversationPages([
+    {},
+    { page_title: "" },
+    { page_url: "https://example.test/" },
+    { page_referrer: "https://example.test/help" },
+    { timestamp: 0 },
+    { future_field: { value: true } },
+  ])
+})
+
+test("live history validation rejects malformed lists and entries", () => {
+  for (const value of [null, {}, "pages", [null], [[]], [42], ["page"]]) {
+    assert.throws(() => assertConversationPages(value), assert.AssertionError)
+  }
+})
+
+test("live history validation checks optional fields when present", () => {
+  for (const field of ["page_title", "page_url", "page_referrer"]) {
+    for (const value of [null, 42, false, {}, []]) {
+      assert.throws(() => assertConversationPages([{ [field]: value }]), assert.AssertionError)
+    }
+  }
+  for (const timestamp of [null, "1790812800000", false, {}, [], NaN, Infinity, -Infinity]) {
+    assert.throws(() => assertConversationPages([{ timestamp }]), assert.AssertionError)
+  }
+})
 
 for (const mode of ["flag", "env"] as const) {
   test(`pages preserves the history payload in read-only ${mode} mode`, async () => {

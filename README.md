@@ -124,8 +124,8 @@ crispctl listen --events session:sync:pages --session session_... --json --read-
 
 `conversations pages` returns one page of browsing history recorded by Crisp for
 the selected conversation/session. `--page` defaults to 1 and accepts positive
-safe integers. JSON output is the returned array, including `page_title`,
-`page_url`, `page_referrer` when available, and `timestamp`; an empty page is `[]`.
+safe integers. JSON output is the returned array; records may contain `page_title`,
+`page_url`, `page_referrer`, and `timestamp`. These fields can be omitted; an empty page is `[]`.
 No additional pages are fetched automatically. This is session history, not the
 visitor's complete browser history or history across all their conversations.
 See [List Conversation Pages](https://docs.crisp.chat/references/rest-api/v1/#list-conversation-pages).

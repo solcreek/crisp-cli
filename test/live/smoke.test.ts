@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { CrispClient } from "../../src/client.js"
 import { assertComplete, resolveCredentials } from "../../src/config.js"
+import { assertConversationPages } from "../conversation-pages-assertions.js"
 
 const enabled = process.env.CRISPCTL_LIVE === "1" || process.env.CRISP_LIVE === "1"
 const pagesSession = process.env.CRISPCTL_LIVE_PAGES_SESSION
@@ -17,14 +18,7 @@ test(
     assertComplete(creds)
     const client = new CrispClient(creds, undefined, true)
     const pages = await client.listConversationPages(pagesSession!)
-    assert.ok(Array.isArray(pages), "pages should be an array")
-    for (const page of pages) {
-      assert.equal(typeof page.page_title, "string")
-      assert.equal(typeof page.page_url, "string")
-      assert.equal(typeof page.timestamp, "number")
-      assert.ok(Number.isFinite(page.timestamp))
-      if (page.page_referrer !== undefined) assert.equal(typeof page.page_referrer, "string")
-    }
+    assertConversationPages(pages)
   },
 )
 

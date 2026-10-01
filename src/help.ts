@@ -49,7 +49,7 @@ The key value is not included.
   "conversations pages": `GET /v1/website/{website_id}/conversation/{session}/pages/{page}
 Returns one page of browsing history recorded by Crisp for this session.
 --page defaults to 1 and must be a positive safe integer. An empty page returns [].
-Fields include page_title, page_url, page_referrer (if available), and timestamp.
+Optional fields: page_title, page_url, page_referrer, and timestamp.
 Requires website:conversation:pages read access.
 For new visits, use listen --events session:sync:pages --session <session> --json.
 `,
