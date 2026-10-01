@@ -1,12 +1,12 @@
 # crispctl
 
-Agent-friendly CLI over the [Crisp REST API](https://docs.crisp.chat/references/rest-api/v1/) for support operations: reply, note, resolve, reopen, assign, segments, mark read, search, people, and operators.
+Agent-friendly CLI over the [Crisp REST API](https://docs.crisp.chat/references/rest-api/v1/) and [RTM API](https://docs.crisp.chat/references/rtm-api/v1/) for support operations: reply, note, resolve, reopen, assign, segments, mark read, search, people, and operators.
 
 `crispctl` speaks HTTP to `https://api.crisp.chat/v1/` with Node's undici `fetch`. Routes match the official [`crisp-api`](https://github.com/crisp-im/node-crisp-api) resource paths. Tests mock that wire with undici `MockAgent`. The CLI does not wrap the SDK, so a test can assert the path and body without stubbing the SDK surface.
 
-## Sandbox only
+## Live access
 
-Use the **Cos Crisp sandbox** website only. Do not point crispctl at the **production Teachify** website. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
+Use the **Cos Crisp sandbox** website for development and write tests. Production **Teachify** access requires explicit authorization and must use `--read-only` or `CRISPCTL_READ_ONLY=1`. This repository and CI contain no Crisp credentials. Live checks stay off unless you opt in locally.
 
 ## Install
 
@@ -54,9 +54,9 @@ Resolution order, highest first:
 | Website | `--website` or `--website-id`, `CRISPCTL_WEBSITE_ID`, `CRISP_WEBSITE_ID`, profile |
 | Tier | `CRISPCTL_TIER`, `CRISP_TIER`, profile |
 
-Global flags (any position): `--json`, `--profile`, `--website`.
+Global flags (any position): `--json`, `--read-only`, `--profile`, `--website`.
 
-`--json` prints one JSON line on stdout. Failures print a JSON object on stderr and exit non-zero. The key is redacted if it would otherwise appear in an error string.
+`--json` prints one JSON line on stdout (one line per event for `listen`). Failures print a JSON object on stderr and exit non-zero. The key is redacted if it would otherwise appear in an error string.
 
 ## Commands
 
@@ -94,11 +94,45 @@ crispctl listen
 
 Requests send HTTP Basic auth (`identifier:key`) and `X-Crisp-Tier`. Stdout is the Crisp `data` payload.
 
-### `listen` (not implemented)
+### Read-only mode
 
-`crispctl listen` exits 2. It does not open a socket.
+```bash
+crispctl --read-only conversations list --json
+CRISPCTL_READ_ONLY=1 crispctl listen --json
+```
 
-The official `crisp-api` Node SDK, when `tier` is `website`, requests `GET /v1/website/connect/endpoints` and omits `website_id`. That route does not work for website tokens. The correct route is `GET /v1/website/{website_id}/connect/endpoints`. Plugin tokens use `GET /v1/plugin/connect/endpoints`, which the SDK does call. A future `listen` has to use the website-scoped route for website-tier tokens. Point that work at the Cos Sandbox website only.
+`--read-only` or `CRISPCTL_READ_ONLY=1` rejects every write operation before it runs, including `reply` (text and notes), `resolve`, `reopen`, `assign`, `segments`, `read` (which marks messages read), and local `auth set`. The HTTP request layer also rejects all methods except GET and HEAD, so bypassing command dispatch cannot send a write through a read-only client. Existing commands retain their normal behavior when read-only mode is absent.
+
+### `listen`
+
+```bash
+crispctl listen --json --read-only
+crispctl listen --json --events message:send,session:set_state --session session_...
+crispctl listen --json --events message:send --count 1 --timeout 60
+```
+
+`listen` is always read-only. It discovers the current `socket.app` endpoint via REST, connects over secure Socket.IO, authenticates with the selected website or plugin token, and subscribes only to the selected website. Website tokens use `GET /v1/website/{website_id}/connect/endpoints`; plugin tokens use `GET /v1/plugin/connect/endpoints`.
+
+The default events are `message:send`, `message:received`, and `session:set_state`. `--events` selects comma-separated event names; token scopes must allow them. `--session` filters received events locally. `--json` writes newline-delimited JSON to stdout:
+
+```json
+{"event":"session:set_state","data":{"website_id":"...","session_id":"session_...","state":"resolved"},"received_at":"2026-10-01T12:00:00.000Z"}
+```
+
+Connection status (`authenticated`, `reconnecting`) and errors go to stderr, also as JSON when `--json` is set. Transient connection/discovery failures retry with exponential backoff capped at 30 seconds. Each retry discovers the endpoint again and reauthenticates. Authentication rejection and non-transient HTTP errors stop with exit 1. Events missed while disconnected are not replayed; consumers should reconcile via REST when needed.
+
+Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits successfully after N matching events; `--timeout S` sets a total deadline in seconds and exits 1 if reached. Without these flags, the listener runs until stopped.
+
+### Verify RTM with 1Password
+
+From a checkout with `op` connected to 1Password:
+
+```bash
+npm run build
+node scripts/rtm-smoke.mjs "<expected website name>"
+```
+
+The script reads `Crisp API Credentials` (`API Identifier`, `API Key`, `website_id`) using the real `op` CLI, verifies the website name via a GET request, and runs the built CLI with a website token and `--read-only --json --count 1 --timeout 60`. It only receives events; it never creates a test message or changes a conversation. It reports event names and payload field names, without customer content or credentials. Credentials remain in memory and the child environment. A successful check requires an actual website event, not just authentication; a quiet website can time out.
 
 ## Testing
 
@@ -109,11 +143,31 @@ npm test
 npm run typecheck
 ```
 
-Coverage is enforced for `src/` (80% lines and statements).
+`npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 20 and 24. No Crisp credentials or external services are needed.
+
+| Layer | What it verifies | Included in CI |
+| --- | --- | --- |
+| Unit | Argument parsing, config, redaction, RTM filtering/retry/cancellation, write rejection | Yes |
+| HTTP integration | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors | Yes |
+| CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes |
+| Live smoke | Real Crisp REST or RTM, explicitly enabled locally | No |
+
+E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
+
+Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
 
 ### Live smoke
 
-`npm run test:live` lists operators with your real credentials. It **skips** (exit 0) unless `CRISPCTL_LIVE=1` or `CRISP_LIVE=1`.
+`npm run test:live` builds the CLI and runs the opt-in live suite. Both checks **skip** by default (exit 0):
+
+- REST operator listing requires `CRISPCTL_LIVE=1` or `CRISP_LIVE=1` and configured credentials (Cos Sandbox only).
+- RTM requires `CRISPCTL_LIVE_RTM=1`, an expected website name, and an authenticated `op` CLI. It reads `Crisp API Credentials` and requires receipt of an actual event within 60 seconds, not merely a successful handshake. It never sends messages or writes data.
+
+```bash
+CRISPCTL_LIVE_RTM=1 CRISPCTL_LIVE_WEBSITE_NAME="<expected website name>" npm run test:live
+```
+
+To run the separate REST smoke check:
 
 ```bash
 export CRISPCTL_PROFILE=sandbox
@@ -125,15 +179,18 @@ export CRISPCTL_LIVE=1
 npm run test:live
 ```
 
-That opt-in is for the **Cos Sandbox** website only. Do not export production Teachify tokens. Do not commit tokens, and do not add them as CI secrets for this workflow. CI runs `npm test` and does not set `CRISPCTL_LIVE`.
+The REST opt-in above is for the **Cos Sandbox** website only. For explicitly authorized production RTM verification, use the read-only 1Password flow. Do not commit tokens or add them as CI secrets. CI runs `npm test` without live flags.
 
 ## Release
 
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md), following [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Add user-facing changes to `Unreleased` as part of each feature or fix.
+
 Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC). There is no npm token in the repo or in GitHub Actions secrets.
 
-1. Set `version` in `package.json` (for example `0.1.0`).
-2. Tag that commit `vX.Y.Z`, matching the `version` field: `git tag v0.1.0 && git push origin v0.1.0`.
-3. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
+1. Set the release version in `package.json` and update `package-lock.json` to match.
+2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
+3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
+4. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
 
 Pull requests run `.github/workflows/ci.yml` (install, typecheck, test, no live call).
 

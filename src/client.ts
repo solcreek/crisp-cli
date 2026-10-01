@@ -1,5 +1,5 @@
 import { fetch as undiciFetch, type Dispatcher } from "undici"
-import { CrispApiError } from "./errors.js"
+import { CrispApiError, UsageError } from "./errors.js"
 import type { Tier } from "./config.js"
 import { version } from "./version.js"
 
@@ -24,7 +24,13 @@ export class CrispClient {
   constructor(
     private readonly creds: ClientCredentials,
     private readonly dispatcher?: Dispatcher,
+    private readonly readOnly = false,
   ) {}
+
+  getConnectEndpoints(signal?: AbortSignal): Promise<unknown> {
+    const path = this.creds.tier === "website" ? this.site("/connect/endpoints") : "/plugin/connect/endpoints"
+    return this.request("GET", path, { signal })
+  }
 
   listConversations(page = 1): Promise<unknown> {
     return this.request("GET", this.site(`/conversations/${page}`))
@@ -118,7 +124,10 @@ export class CrispClient {
     return `/website/${encodeURIComponent(this.creds.websiteId)}${suffix}`
   }
 
-  private async request(method: string, path: string, opts?: { query?: Query; body?: unknown }): Promise<unknown> {
+  private async request(method: string, path: string, opts?: { query?: Query; body?: unknown; signal?: AbortSignal }): Promise<unknown> {
+    if (this.readOnly && method !== "GET" && method !== "HEAD") {
+      throw new UsageError("read-only mode: write operations are disabled")
+    }
     const url = new URL(`/v1${path}`, CRISP_ORIGIN)
     for (const [key, value] of Object.entries(opts?.query ?? {})) {
       if (value !== undefined) {
@@ -146,7 +155,7 @@ export class CrispClient {
         body,
         redirect: "error",
         dispatcher: this.dispatcher,
-        signal: AbortSignal.timeout(20_000),
+        signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : "request failed"

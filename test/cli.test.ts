@@ -7,7 +7,6 @@ import { test } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { isDirectInvocation } from "../src/index.js"
 import { run } from "../src/cli.js"
-import { connectEndpointsPath, SDK_WEBSITE_TIER_CONNECT_PATH } from "../src/rtm.js"
 import { buffers, credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from "./support.js"
 
 const COMMANDS = [
@@ -194,22 +193,12 @@ test("missing credentials fail before a request and do not print a key", async (
   }
 })
 
-test("listen stub documents the website-tier connect path and exits 2", async () => {
+test("listen requires credentials", async () => {
   const io = buffers()
-  const code = await run(["listen", "--website", FIXTURE.websiteId], { ...io, env: { HOME: tmpdir() } })
+  const code = await run(["listen", "--json"], { ...io, env: { HOME: tmpdir() } })
   assert.equal(code, 2)
-  assert.match(io.out(), new RegExp(SDK_WEBSITE_TIER_CONNECT_PATH.replaceAll("/", "\\/")))
-  assert.match(io.out(), /\/v1\/website\/\{website_id\}\/connect\/endpoints|\/v1\/website\/8c842203/)
-  assert.match(io.out(), new RegExp(connectEndpointsPath("website", FIXTURE.websiteId).replaceAll("/", "\\/")))
-  assert.match(io.out(), /plugin\/connect\/endpoints/)
-  assert.match(io.out(), /Teachify/)
-  assert.equal(connectEndpointsPath("plugin", FIXTURE.websiteId), "/v1/plugin/connect/endpoints")
-
-  const json = buffers()
-  assert.equal(await run(["--json", "listen"], { ...json, env: { HOME: tmpdir() } }), 2)
-  const body = JSON.parse(json.out()) as { error: string; sdk_website_tier_path: string }
-  assert.equal(body.error, "not_implemented")
-  assert.equal(body.sdk_website_tier_path, SDK_WEBSITE_TIER_CONNECT_PATH)
+  assert.equal(io.out(), "")
+  assert.equal(JSON.parse(io.err()).error, "config")
 })
 
 test("human errors stay on stderr", async () => {

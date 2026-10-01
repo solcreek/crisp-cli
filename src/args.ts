@@ -4,6 +4,7 @@ export type Flags = {
   json: boolean
   help: boolean
   version: boolean
+  readOnly: boolean
   unassign: boolean
   profile?: string
   website?: string
@@ -17,6 +18,10 @@ export type Flags = {
   user?: string
   set?: string
   searchType?: string
+  events?: string
+  session?: string
+  timeout?: string
+  count?: string
 }
 
 export type ParsedArgv = {
@@ -25,7 +30,7 @@ export type ParsedArgv = {
   positionals: string[]
 }
 
-const BOOLEAN_FLAGS = new Set(["json", "help", "version", "unassign"])
+const BOOLEAN_FLAGS = new Set(["json", "help", "version", "unassign", "read-only"])
 
 const STRING_FLAGS = new Set([
   "profile",
@@ -40,6 +45,10 @@ const STRING_FLAGS = new Set([
   "user",
   "set",
   "search-type",
+  "events",
+  "session",
+  "timeout",
+  "count",
 ])
 
 export function parseArgv(argv: string[]): ParsedArgv {
@@ -48,6 +57,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
     help: false,
     version: false,
     unassign: false,
+    readOnly: false,
   }
   const seen = new Set<string>()
   const positionals: string[] = []
@@ -86,6 +96,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       if (name === "json") flags.json = true
       if (name === "help") flags.help = true
       if (name === "version") flags.version = true
+      if (name === "read-only") flags.readOnly = true
       if (name === "unassign") flags.unassign = true
       continue
     }
@@ -116,6 +127,12 @@ export function parseArgv(argv: string[]): ParsedArgv {
 
 function assignString(flags: Flags, name: string, value: string): void {
   switch (name) {
+    case "events":
+    case "session":
+    case "timeout":
+    case "count":
+      flags[name] = value
+      return
     case "profile":
       flags.profile = value
       return
@@ -162,7 +179,7 @@ export function websiteOverride(flags: Flags): string | undefined {
   return value ? value : undefined
 }
 
-const GLOBAL_FLAGS = new Set(["json", "help", "version", "profile", "website", "website-id"])
+const GLOBAL_FLAGS = new Set(["json", "help", "version", "profile", "website", "website-id", "read-only"])
 
 export function assertAllowedFlags(seen: Set<string>, allowed: readonly string[]): void {
   const ok = new Set<string>([...GLOBAL_FLAGS, ...allowed])

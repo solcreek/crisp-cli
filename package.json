@@ -11,6 +11,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
@@ -30,16 +31,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "test": "c8 node --enable-source-maps --import tsx --test test/*.test.ts",
-    "test:live": "node --import tsx --test test/live/smoke.test.ts",
+    "test": "npm run build && c8 node --enable-source-maps --import tsx --test test/*.test.ts",
+    "test:live": "npm run build && node --import tsx --test test/live/*.test.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "socket.io-client": "^4.8.4",
     "undici": "^6.21.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
     "c8": "^10.1.3",
+    "socket.io": "^4.8.4",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },
@@ -49,9 +52,9 @@
     "include": ["src/**/*.ts"],
     "reporter": ["text", "text-summary"],
     "check-coverage": true,
-    "lines": 80,
-    "statements": 80,
-    "functions": 80,
-    "branches": 75
+    "lines": 95,
+    "statements": 95,
+    "functions": 95,
+    "branches": 85
   }
 }

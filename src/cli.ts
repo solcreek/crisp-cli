@@ -12,10 +12,11 @@ import {
   type ConfigFile,
   type Tier,
 } from "./config.js"
-import { exitCodeFor, UsageError } from "./errors.js"
+import { CrispApiError, exitCodeFor, UsageError } from "./errors.js"
 import { renderHelp, ROOT_HELP, usage } from "./help.js"
 import { writeErr, writeOut } from "./output.js"
-import { listenStubMessage, PLUGIN_CONNECT_PATH, SDK_WEBSITE_TIER_CONNECT_PATH } from "./rtm.js"
+import { listen, parseEvents, positiveInteger, type SocketFactory } from "./rtm.js"
+import { redactSecrets } from "./redact.js"
 import { version } from "./version.js"
 
 export type RunOptions = {
@@ -23,6 +24,8 @@ export type RunOptions = {
   stderr?: (chunk: string) => void
   env?: NodeJS.ProcessEnv
   dispatcher?: Dispatcher
+  signal?: AbortSignal
+  socketFactory?: SocketFactory
 }
 
 type IO = {
@@ -30,6 +33,8 @@ type IO = {
   stderr: (chunk: string) => void
   env: NodeJS.ProcessEnv
   dispatcher?: Dispatcher
+  signal?: AbortSignal
+  socketFactory?: SocketFactory
   flags: Flags
 }
 
@@ -42,7 +47,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
   try {
     const parsed = parseArgv(argv)
     flags = parsed.flags
-    const io: IO = { stdout, stderr, env, dispatcher: options.dispatcher, flags }
+    const io: IO = { stdout, stderr, env, dispatcher: options.dispatcher, signal: options.signal, socketFactory: options.socketFactory, flags }
     return await execute(parsed, io)
   } catch (err) {
     writeErr(stderr, flags?.json ?? wantsJson, err, collectSecrets(env, flags))
@@ -67,6 +72,10 @@ async function execute(parsed: ParsedArgv, io: IO): Promise<number> {
   }
 
   const [command, sub, ...rest] = positionals
+  if (isReadOnly(io) && (command === "auth" && sub === "set" ||
+      ["reply", "resolve", "reopen", "assign", "segments", "read"].includes(command))) {
+    throw new UsageError("read-only mode: write operations are disabled")
+  }
   switch (command) {
     case "auth":
       return authCommand(sub, rest, seen, io)
@@ -290,23 +299,45 @@ async function operatorsCommand(sub: string | undefined, rest: string[], seen: S
   return 0
 }
 
-function listenCommand(extra: string | undefined, seen: Set<string>, io: IO): number {
-  assertAllowedFlags(seen, [])
+async function listenCommand(extra: string | undefined, seen: Set<string>, io: IO): Promise<number> {
+  assertAllowedFlags(seen, ["events", "session", "timeout", "count"])
   if (extra !== undefined) throw new UsageError(`usage: ${usage.listen}`)
-  const message = listenStubMessage(websiteOverride(io.flags))
-  if (io.flags.json) {
-    writeOut(io.stdout, true, {
-      ok: false,
-      error: "not_implemented",
-      message,
-      sdk_website_tier_path: SDK_WEBSITE_TIER_CONNECT_PATH,
-      website_path: "/v1/website/{website_id}/connect/endpoints",
-      plugin_path: PLUGIN_CONNECT_PATH,
+  const events = parseEvents(io.flags.events)
+  const count = positiveInteger(io.flags.count, "count")
+  const timeout = positiveInteger(io.flags.timeout, "timeout")
+  if (timeout !== undefined && timeout > 2_147_483) throw new UsageError("--timeout is too large")
+  const session = io.flags.session === undefined ? undefined : requireArg(io.flags.session, usage.listen)
+  const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
+  assertComplete(creds)
+  const controller = new AbortController()
+  let timedOut = false
+  const stop = () => controller.abort()
+  process.once("SIGINT", stop)
+  process.once("SIGTERM", stop)
+  io.signal?.addEventListener("abort", stop, { once: true })
+  if (io.signal?.aborted) stop()
+  const timer = timeout === undefined ? undefined : setTimeout(() => {
+    timedOut = true
+    stop()
+  }, timeout * 1000)
+  try {
+    await listen(new CrispClient(creds, io.dispatcher, true), creds, {
+      events, session, count, signal: controller.signal, socketFactory: io.socketFactory,
+      onEvent: event => writeOut(chunk => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
+      onStatus: status => writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
     })
-  } else {
-    io.stdout(`${message}\n`)
+    if (timedOut) throw new CrispApiError(0, "timeout", "RTM listen deadline reached")
+    return 0
+  } finally {
+    clearTimeout(timer)
+    process.removeListener("SIGINT", stop)
+    process.removeListener("SIGTERM", stop)
+    io.signal?.removeEventListener("abort", stop)
   }
-  return 2
+}
+
+function isReadOnly(io: IO): boolean {
+  return io.flags.readOnly || io.env.CRISPCTL_READ_ONLY === "1"
 }
 
 function clientFrom(io: IO): CrispClient {
@@ -323,6 +354,7 @@ function clientFrom(io: IO): CrispClient {
       websiteId: creds.websiteId,
     },
     io.dispatcher,
+    isReadOnly(io),
   )
 }
 
