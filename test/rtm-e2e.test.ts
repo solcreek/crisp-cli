@@ -195,3 +195,38 @@ test("E2E a stalled reader causes bounded-output failure and closes RTM", { time
   assert.match(stderr, /stdout buffer exceeded 8388608 bytes/)
   assert.doesNotMatch(stderr, /Unhandled|node:events/)
 })
+
+for (const sessionFilter of [false, true]) {
+  test(`E2E independent payload fixtures preserve content with session filter ${sessionFilter}`, { timeout: 15_000 }, async t => {
+    const fixtures = JSON.parse(readFileSync(path("./fixtures/rtm-payloads.json"), "utf8")) as { event: string; data: Record<string, unknown> }[]
+    const expected = sessionFilter ? fixtures.filter(item => ["message:send", "message:received", "email:track:view"].includes(item.event)) : fixtures
+    const endpoint = await server(t, socket => {
+      socket.emit("authenticated")
+      for (const fixture of fixtures) {
+        for (const malformed of [null, [], "string", 42, {}, { website_id: 123 }, { website_id: { id: FIXTURE.websiteId } }]) {
+          socket.emit(fixture.event, malformed)
+        }
+        socket.emit(fixture.event, { ...fixture.data, website_id: "other-website" })
+      }
+      // Invalid nested routing fields and session types must not pass the filter.
+      for (const resource of [null, [], {}, { type: "website", id: 123 }, { type: "user", id: FIXTURE.websiteId }]) {
+        socket.emit("bucket:url:upload:generated", { resource, identifier: FIXTURE.websiteId })
+      }
+      if (sessionFilter) {
+        for (const session_id of [null, [], {}, 123, "other-session"]) {
+          socket.emit("message:send", { website_id: FIXTURE.websiteId, session_id })
+        }
+        socket.emit("email:track:view", { website_id: FIXTURE.websiteId, type: "campaign", identifier: FIXTURE.session })
+      }
+      if (sessionFilter) socket.emit("plugin:event", fixtures.find(item => item.event === "plugin:event")!.data)
+      for (const fixture of fixtures) socket.emit(fixture.event, fixture.data)
+    })
+    const result = await cli(t, endpoint, ["listen", "--json", "--events", fixtures.map(item => item.event).join(","),
+      "--count", String(expected.length), "--timeout", "10", ...(sessionFilter ? ["--session", FIXTURE.session] : [])]).completed
+    assert.equal(result.code, 0, result.stderr)
+    assert.deepEqual(result.stdout.trim().split("\n").map(line => {
+      const { event, data } = JSON.parse(line)
+      return { event, data }
+    }), expected)
+  })
+}

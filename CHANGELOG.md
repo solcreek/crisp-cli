@@ -9,6 +9,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Extend WSS E2E coverage with independent representative payload fixtures and
+  malformed routing fields, alongside the full event namespace matrix.
 - Require shared Node 20/24 verification before publishing, including typecheck,
   both coverage gates and a smoke test of the installed npm tarball.
 
