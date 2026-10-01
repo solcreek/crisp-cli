@@ -42,6 +42,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Reject empty or whitespace-only event names in the RTM smoke monitor so
+  malformed records cannot count as verified event delivery.
+
 - Subscribe to `message:received` for operator notes in the sandbox live write
   check, with a full offline regression over local TLS and Socket.IO.
 

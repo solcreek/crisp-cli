@@ -138,6 +138,29 @@ test("auth mode stops once without claiming event delivery", async () => {
   assert.equal(reports.at(-1).received_events, 0)
 })
 
+for (const name of ["", " \t\n"]) {
+  test(`monitor rejects blank event name ${JSON.stringify(name)} despite authentication and clean exit`, async () => {
+    const child = fixture()
+    const { result, reports } = monitor(child)
+    child.stderr.write(auth)
+    child.stdout.write(JSON.stringify({ event: name, data: { website_id: "fixture-site" } }) + "\n")
+    await close(child)
+    assert.equal(await result, false)
+    assert.deepEqual(child.kills, ["SIGTERM"])
+    assert.equal(
+      reports.some((report) => report.check === "event"),
+      false,
+    )
+    assert.deepEqual(reports.at(-1), {
+      check: "result",
+      mode: "event",
+      authenticated: true,
+      exit_code: 0,
+      received_events: 0,
+    })
+  })
+}
+
 for (const mode of [
   "missing-auth",
   "missing-event",

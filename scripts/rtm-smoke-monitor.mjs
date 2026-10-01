@@ -105,7 +105,8 @@ export function monitorRtmSmoke(child, options) {
           typeof data !== "object" ||
           !("website_id" in data) ||
           data.website_id !== websiteId ||
-          typeof event.event !== "string"
+          typeof event.event !== "string" ||
+          event.event.trim().length === 0
         ) {
           fail()
           return
