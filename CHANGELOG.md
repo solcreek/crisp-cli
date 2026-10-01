@@ -7,11 +7,30 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Verify published npm versions with bounded registry polling and an installed
+  executable smoke test; allow verification-only reruns without republishing.
+
 ### Changed
 
 - Enforce Oxfmt formatting and Oxlint correctness checks in local verification,
   CI and the release gate, with pinned development dependencies and a separate
   formatting baseline recorded for Git blame.
+
+### Fixed
+
+- Reject release verification inputs with leading zeroes in numeric prerelease
+  identifiers before contacting npm, avoiding unnecessary registry polling.
+- Clean build output before compiling and suppress output on type errors, so npm
+  packages cannot retain deleted modules or artifacts from failed builds.
+- Reject page numbers outside JavaScript’s safe integer range instead of rounding
+  or sending `Infinity`; share numeric validation with RTM count and timeout flags.
+- Keep the credentials used by each invocation available for redaction even if
+  config or environment credentials rotate, and redact secrets in help topics.
+- Propagate cancellation through REST requests and response bodies, prevent
+  cancelled writes and follow-up requests, and handle process signals while REST
+  commands are running.
 
 ## [0.4.0] - 2026-10-01
 

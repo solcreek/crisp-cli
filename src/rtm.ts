@@ -33,15 +33,6 @@ export function parseEvents(raw?: string): string[] {
   return events
 }
 
-export function positiveInteger(raw: string | undefined, flag: string): number | undefined {
-  if (raw === undefined) return undefined
-  const value = Number(raw)
-  if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(value)) {
-    throw new UsageError(`--${flag} must be a positive integer`)
-  }
-  return value
-}
-
 export function socketEndpoint(data: unknown): URL {
   const app = (data as { socket?: { app?: unknown } } | null)?.socket?.app
   let endpoint: URL

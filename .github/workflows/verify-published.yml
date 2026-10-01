@@ -1,0 +1,33 @@
+name: Verify Published Package
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact npm version to verify (verification only, never publishes)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Wait for registry availability and test the installed executable
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$RELEASE_VERSION" ]; then
+            npm run test:published -- "$RELEASE_VERSION"
+          else
+            npm run test:published
+          fi

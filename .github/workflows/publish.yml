@@ -31,3 +31,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm publish
+
+  verify-published:
+    needs: publish
+    uses: ./.github/workflows/verify-published.yml

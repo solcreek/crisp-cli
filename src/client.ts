@@ -25,6 +25,7 @@ export class CrispClient {
     private readonly creds: ClientCredentials,
     private readonly dispatcher?: Dispatcher,
     private readonly readOnly = false,
+    private readonly signal?: AbortSignal,
   ) {}
 
   getConnectEndpoints(signal?: AbortSignal): Promise<unknown> {
@@ -167,15 +168,18 @@ export class CrispClient {
     let response: Awaited<ReturnType<typeof undiciFetch>> | undefined
     let text: string
     try {
+      const signals = [this.signal, opts?.signal, AbortSignal.timeout(20_000)].filter(
+        (signal): signal is AbortSignal => signal !== undefined,
+      )
+      const signal = AbortSignal.any(signals)
+      signal.throwIfAborted()
       response = await undiciFetch(url, {
         method,
         headers,
         body,
         redirect: "error",
         dispatcher: this.dispatcher,
-        signal: opts?.signal
-          ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)])
-          : AbortSignal.timeout(20_000),
+        signal,
       })
       text = await response.text()
     } catch (err) {

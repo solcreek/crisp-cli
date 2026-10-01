@@ -113,3 +113,35 @@ test("operation layer rejects writes even when bypassing command routing", async
     assert.equal(io.err(), "")
   }
 })
+
+test("operation layer permits read-only requests without a CLI invocation context", async () => {
+  const { operatorsList } = await import("../src/operations.js")
+  const env = credentialEnv()
+  const io = buffers()
+  try {
+    const calls = await withCrispMock({ status: 200, json: okEnvelope([]) }, async (dispatcher) => {
+      assert.equal(
+        await operatorsList({
+          ...io,
+          env,
+          dispatcher,
+          flags: {
+            json: true,
+            help: false,
+            version: false,
+            listEvents: false,
+            unassign: false,
+            readOnly: true,
+          },
+        }),
+        0,
+      )
+    })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0]?.method, "GET")
+    assert.deepEqual(JSON.parse(io.out()), [])
+    assert.equal(io.err(), "")
+  } finally {
+    removeHome(env)
+  }
+})
