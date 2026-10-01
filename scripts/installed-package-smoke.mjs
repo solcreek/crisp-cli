@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
+/** @param {string} directory @returns {NodeJS.ProcessEnv} */
 export function smokeEnvironment(directory) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !/^CRISP(?:CTL)?_/.test(key)),
@@ -12,6 +13,11 @@ export function smokeEnvironment(directory) {
   return env
 }
 
+/**
+ * @param {string} spec
+ * @param {string} version
+ * @param {ReadonlyArray<{event: string, tiers: readonly string[], scopes: readonly string[]}>} [expectedEvents]
+ */
 export function installedPackageSmoke(spec, version, expectedEvents) {
   const directory = mkdtempSync(join(tmpdir(), "crispctl-installed-"))
   const env = smokeEnvironment(directory)
@@ -32,6 +38,7 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
       { env, stdio: "pipe", timeout: 120_000 },
     )
     const bin = resolve(directory, "node_modules/.bin/crispctl")
+    /** @param {string[]} args */
     const run = (args) =>
       execFileSync(bin, args, { cwd: directory, env, encoding: "utf8", timeout: 10_000 })
     assert.equal(run(["--version"]).trim(), version)
@@ -45,8 +52,8 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
       events.every(
         (entry) =>
           typeof entry.event === "string" &&
-          Array.isArray(entry.tiers) &&
-          Array.isArray(entry.scopes),
+          isStringArray(entry.tiers) &&
+          isStringArray(entry.scopes),
       ),
     )
     assert.equal(new Set(events.map((entry) => entry.event)).size, events.length)
@@ -66,4 +73,9 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+}
+
+/** @param {unknown} value */
+function isStringArray(value) {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string")
 }

@@ -14,7 +14,9 @@ try {
   // execFileSync errors include captured subprocess output; keep that private.
   const message = installing
     ? "Published package installation or executable smoke failed; rerun verification without republishing."
-    : error.message
+    : error instanceof Error
+      ? error.message
+      : "Published package verification failed"
   console.error(JSON.stringify({ check: "published-package", version, passed: false, message }))
   process.exitCode = 1
 }

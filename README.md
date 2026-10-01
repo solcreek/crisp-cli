@@ -199,9 +199,12 @@ The mechanical formatting commit is recorded in `.git-blame-ignore-revs`. Use
 `git blame --ignore-revs-file .git-blame-ignore-revs <file>` to see the preceding
 history when reviewing code ownership.
 
-`npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 22 and 24. No Crisp credentials or external services are needed.
+`npm test` builds the CLI and runs all offline tests with coverage. CI tests the Node.js 22.12.0 minimum, current Node 22, and Node 24. No Crisp credentials or external services are needed.
 
 Commander defines the command tree and generates help in `src/command-tree.ts`.
+Option names derive from `src/command-options.ts`; the command map must cover
+every help-notes entry. Compile-time checks reject unknown names, and runtime
+tests exercise both help forms for every command.
 `src/cli.ts` adapts parsing and errors to the CLI's JSON and exit-code contract;
 `src/operations.ts` performs command operations through injected IO and enforces
 read-only mode before writes. REST, RTM, output and lifecycle code remain separate
@@ -212,9 +215,11 @@ expose a previously used key in diagnostics. REST requests and response bodies
 honor cancellation, including SIGINT/SIGTERM in the executable. Cancellation
 prevents subsequent requests; a write already sent to Crisp may have taken effect.
 
-`npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM coverage gate and
-`test:package`. The package smoke installs an actual tarball into a temporary
-directory and checks its executable, version, help, event catalog and error exit.
+`npm run verify` runs formatting, lint and typecheck, then builds once and runs
+the complete offline suite once. It reuses that run’s V8 coverage data for
+`coverage:rtm` and `coverage:tooling`, then smoke-tests the same built package.
+`test:rtm`, `test:tooling` and `test:package` remain standalone commands.
+The package smoke installs an actual tarball into a temporary directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 | Layer                     | What it verifies                                                                                                                                                                        | Included in CI   |
@@ -228,7 +233,14 @@ It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
-Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and runs on both CI Node versions. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
+Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and is checked on every CI Node version. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
+
+The registry, installed-package and published-package verification helpers also
+use TypeScript `checkJs` with JSDoc contracts. `npm run test:tooling` exercises them
+with offline subprocess fixtures and enforces **95% lines/statements, 100%
+functions and 90% branches** independently of `src/` coverage. Cases include
+installation failure, wrong executable versions, malformed or inconsistent event
+catalogs, invalid exit codes, credential isolation and temporary-directory cleanup.
 
 ### Live smoke
 
@@ -271,7 +283,7 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including formatting, lint, typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on Node 22.12.0, current Node 22, and Node 24, including formatting, lint, typecheck, all three coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 5. The separate `verify-published` job polls public npm metadata for up to 45 minutes,
    then installs the exact published version and checks its executable, help, event
    catalog and JSON error exit. No Crisp credentials or OIDC write permissions are

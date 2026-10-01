@@ -17,7 +17,6 @@ import { usage } from "./help.js"
 import { writeOut } from "./output.js"
 import { listen, parseEvents } from "./rtm.js"
 import { RTM_EVENTS, RTM_REFERENCE_CHECKED, RTM_REFERENCE_URL } from "./rtm-events.js"
-import { redactSecrets } from "./redact.js"
 import { RunLifecycle } from "./lifecycle.js"
 
 import type { IO } from "./context.js"
@@ -35,11 +34,8 @@ export function authShow(io: IO): number {
 }
 
 export async function conversationsList(io: IO): Promise<number> {
-  writeOut(
-    io.stdout,
-    io.flags.json,
-    await clientFrom(io).listConversations(pageNumber(io.flags.page)),
-  )
+  const page = pageNumber(io.flags.page)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversations(page))
   return 0
 }
 
@@ -51,13 +47,14 @@ export async function conversationsGet(io: IO, sessionRaw?: string): Promise<num
 
 export async function conversationsSearch(io: IO, queryRaw?: string): Promise<number> {
   const query = requireArg(queryRaw, usage.conversationsSearch)
+  const page = pageNumber(io.flags.page)
   const searchType = io.flags.searchType ?? "text"
   if (searchType !== "text" && searchType !== "segment")
     throw new UsageError("--search-type must be text or segment")
   writeOut(
     io.stdout,
     io.flags.json,
-    await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType),
+    await clientFrom(io).searchConversations(query, page, searchType),
   )
   return 0
 }
@@ -212,8 +209,7 @@ export async function listenCommand(io: IO): Promise<number> {
       count,
       signal: lifecycle.signal,
       socketFactory: io.socketFactory,
-      onEvent: (event) =>
-        writeOut((chunk) => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
+      onEvent: (event) => writeOut(io.stdout, io.flags.json, event, [creds.key]),
       onStatus: (status) =>
         writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
     })

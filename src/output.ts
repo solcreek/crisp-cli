@@ -1,5 +1,5 @@
 import { CrispApiError, ConfigError, UsageError } from "./errors.js"
-import { redactSecrets } from "./redact.js"
+import { jsonRedactor, redactSecrets } from "./redact.js"
 
 export type ErrorPayload = {
   ok: false
@@ -10,12 +10,19 @@ export type ErrorPayload = {
   retry_after?: string
 }
 
-export function writeOut(stdout: (chunk: string) => void, json: boolean, value: unknown): void {
+export function writeOut(
+  stdout: (chunk: string) => void,
+  json: boolean,
+  value: unknown,
+  secrets: readonly (string | undefined)[] = [],
+): void {
   if (!json && typeof value === "string") {
-    stdout(value.endsWith("\n") ? value : `${value}\n`)
+    const text = redactSecrets(value, secrets)
+    stdout(text.endsWith("\n") ? text : `${text}\n`)
     return
   }
-  stdout(`${json ? JSON.stringify(value) : JSON.stringify(value, null, 2)}\n`)
+  const replacer = secrets.length ? jsonRedactor(secrets) : undefined
+  stdout(`${JSON.stringify(value, replacer, json ? undefined : 2)}\n`)
 }
 
 export function errorPayload(err: unknown, secrets: readonly (string | undefined)[]): ErrorPayload {

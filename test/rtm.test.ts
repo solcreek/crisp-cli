@@ -843,3 +843,43 @@ test("100 reconnects leave no socket listeners or abort listeners behind", async
   t.mock.timers.tick(60_000)
   assert.equal(discoveries, 101)
 })
+
+for (const key of ['fixture-"quoted"-key', "fixture-\\-key", "fixture-\n-key", "123"]) {
+  for (const json of [true, false]) {
+    test(`RTM redacts structured strings while preserving JSON types (${JSON.stringify(key)}, json=${json})`, async () => {
+      const env = credentialEnv({ CRISP_KEY: key, CRISP_TIER: "website" })
+      const io = buffers()
+      const payload = {
+        website_id: FIXTURE.websiteId,
+        content: key,
+        nested: [{ [key]: `prefix ${key} suffix`, number: 123456, flag: true, empty: null }],
+      }
+      const h = harness((_auth, socket) => {
+        socket.receive("authenticated")
+        socket.receive("message:send", payload)
+      })
+      try {
+        await withCrispMock({ status: 200, json: okEnvelope(endpoint) }, async (dispatcher) => {
+          assert.equal(
+            await run(["listen", "--count", "1", ...(json ? ["--json"] : [])], {
+              ...io,
+              env,
+              dispatcher,
+              socketFactory: h.factory,
+            }),
+            0,
+          )
+        })
+        const event = JSON.parse(io.out())
+        assert.equal(event.data.content, "[redacted]")
+        assert.deepEqual(event.data.nested, [
+          { "[redacted]": "prefix [redacted] suffix", number: 123456, flag: true, empty: null },
+        ])
+        assert.equal(payload.content, key)
+        if (json) assert.equal(io.out().trim().split("\n").length, 1)
+      } finally {
+        removeHome(env)
+      }
+    })
+  }
+}

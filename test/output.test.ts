@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { run } from "../src/cli.js"
 import { CrispApiError } from "../src/errors.js"
-import { errorPayload, writeErr } from "../src/output.js"
+import { errorPayload, writeErr, writeOut } from "../src/output.js"
 import { buffers, credentialEnv, FIXTURE, removeHome, withCrispMock } from "./support.js"
 
 test("API error payload redacts every remote string before JSON serialization", () => {
@@ -83,3 +83,37 @@ for (const json of [false, true]) {
     }
   })
 }
+
+test("structured redaction preserves shared objects, dates, buffers and the input", () => {
+  const shared = { text: "fixture-secret", __proto__: null }
+  const value = {
+    first: shared,
+    second: shared,
+    date: new Date("2026-01-01T00:00:00Z"),
+    binary: Buffer.from([1, 2, 3]),
+  }
+  const io = buffers()
+  writeOut(io.stdout, true, value, ["fixture-secret"])
+  assert.deepEqual(JSON.parse(io.out()), {
+    first: { text: "[redacted]" },
+    second: { text: "[redacted]" },
+    date: "2026-01-01T00:00:00.000Z",
+    binary: { type: "Buffer", data: [1, 2, 3] },
+  })
+  assert.equal(shared.text, "fixture-secret")
+})
+
+test("structured redaction still rejects circular objects without writing partial JSON", () => {
+  const circular: Record<string, unknown> = {}
+  circular.self = circular
+  const io = buffers()
+  assert.throws(() => writeOut(io.stdout, true, circular, ["fixture-secret"]), /circular/i)
+  assert.equal(io.out(), "")
+})
+
+test("plain text redaction preserves the trailing newline contract", () => {
+  const io = buffers()
+  writeOut(io.stdout, false, "fixture-secret", ["fixture-secret"])
+  writeOut(io.stdout, false, "fixture-secret\n", ["fixture-secret"])
+  assert.equal(io.out(), "[redacted]\n[redacted]\n")
+})

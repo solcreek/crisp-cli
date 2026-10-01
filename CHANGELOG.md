@@ -9,17 +9,29 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Type-check the registry and installed-package verification scripts, enforce
+  their coverage separately, and test installation and executable contract failures
+  using offline fixtures.
 - Verify published npm versions with bounded registry polling and an installed
   executable smoke test; allow verification-only reruns without republishing.
 
 ### Changed
 
+- Type-check command names, option names and help-note completeness from shared
+  metadata, with help verification for every command.
+- Build and run the full offline suite once per verification, reusing coverage
+  data for RTM and release-tooling gates and the build for package smoke tests.
+- Verify the minimum supported Node.js 22.12.0 in CI alongside current Node 22 and 24.
 - Enforce Oxfmt formatting and Oxlint correctness checks in local verification,
   CI and the release gate, with pinned development dependencies and a separate
   formatting baseline recorded for Git blame.
 
 ### Fixed
 
+- Validate conversation page arguments before resolving credentials, keeping
+  invalid arguments as usage errors even with missing or malformed configuration.
+- Redact RTM string values and property names during JSON serialization, preserving
+  escaped credentials, numeric fields and valid NDJSON output.
 - Reject release verification inputs with leading zeroes in numeric prerelease
   identifiers before contacting npm, avoiding unnecessary registry polling.
 - Clean build output before compiling and suppress output on type errors, so npm
