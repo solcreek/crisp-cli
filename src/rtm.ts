@@ -2,6 +2,7 @@ import { io, type Socket } from "socket.io-client"
 import { setTimeout as delay } from "node:timers/promises"
 import type { CrispClient, ClientCredentials } from "./client.js"
 import { CrispApiError, UsageError } from "./errors.js"
+import { assertEventTiers } from "./rtm-events.js"
 
 export const DEFAULT_EVENTS = ["message:send", "message:received", "session:set_state"]
 
@@ -58,6 +59,7 @@ export async function listen(
   creds: ClientCredentials,
   options: ListenOptions,
 ): Promise<void> {
+  assertEventTiers(options.events, creds.tier)
   let received = 0
   let failures = 0
   while (!options.signal.aborted) {
@@ -141,10 +143,7 @@ function connection(
     socket.on("disconnect", () => finish(authenticated ? "connected" : "retry"))
     for (const event of options.events) {
       socket.on(event, (data: unknown) => {
-        if (!authenticated || !data || typeof data !== "object") return
-        const payload = data as { website_id?: unknown; session_id?: unknown }
-        if (payload.website_id !== creds.websiteId) return
-        if (options.session && payload.session_id !== options.session) return
+        if (!authenticated || !matchesScope(event, data, creds.websiteId, options.session)) return
         try {
           if (onEvent({ event, data, received_at: new Date().toISOString() })) finish("done")
         } catch (error) {
@@ -155,4 +154,25 @@ function connection(
     if (options.signal.aborted) abort()
     else socket.connect()
   })
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined
+}
+
+function matchesScope(event: string, data: unknown, websiteId: string, session?: string): boolean {
+  const payload = record(data)
+  if (!payload) return false
+  // Bucket responses identify the website through resource, not website_id.
+  // Never infer a website from the ambiguous top-level identifier field.
+  if (event.startsWith("bucket:url:")) {
+    const resource = record(payload.resource)
+    if (resource?.type !== "website" || resource.id !== websiteId) return false
+    if (payload.website_id !== undefined && payload.website_id !== websiteId) return false
+  } else if (payload.website_id !== websiteId) return false
+  if (!session) return true
+  const sessionId = event === "email:track:view" && payload.type === "session"
+    ? payload.identifier : payload.session_id
+  return sessionId === session
 }

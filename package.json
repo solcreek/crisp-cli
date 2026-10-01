@@ -12,6 +12,7 @@
     "dist",
     "README.md",
     "CHANGELOG.md",
+    "docs/rtm-coverage.md",
     "LICENSE"
   ],
   "engines": {
@@ -32,6 +33,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "npm run build && c8 node --enable-source-maps --import tsx --test test/*.test.ts",
+    "test:rtm": "npm run build && c8 --reports-dir=coverage/rtm --include=src/rtm*.ts --lines=100 --statements=100 --functions=100 --branches=95 node --enable-source-maps --import tsx --test test/rtm*.test.ts",
+    "check:rtm-reference": "npm run build && node scripts/check-rtm-reference.mjs",
     "test:live": "npm run build && node --import tsx --test test/live/*.test.ts",
     "prepublishOnly": "npm run build"
   },

@@ -4,6 +4,7 @@ export type Flags = {
   json: boolean
   help: boolean
   version: boolean
+  listEvents: boolean
   readOnly: boolean
   unassign: boolean
   profile?: string
@@ -30,7 +31,7 @@ export type ParsedArgv = {
   positionals: string[]
 }
 
-const BOOLEAN_FLAGS = new Set(["json", "help", "version", "unassign", "read-only"])
+const BOOLEAN_FLAGS = new Set(["json", "help", "version", "unassign", "read-only", "list-events"])
 
 const STRING_FLAGS = new Set([
   "profile",
@@ -58,6 +59,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
     version: false,
     unassign: false,
     readOnly: false,
+    listEvents: false,
   }
   const seen = new Set<string>()
   const positionals: string[] = []
@@ -96,6 +98,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       if (name === "json") flags.json = true
       if (name === "help") flags.help = true
       if (name === "version") flags.version = true
+      if (name === "list-events") flags.listEvents = true
       if (name === "read-only") flags.readOnly = true
       if (name === "unassign") flags.unassign = true
       continue

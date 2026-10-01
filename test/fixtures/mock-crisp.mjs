@@ -4,9 +4,9 @@ const agent = new MockAgent()
 agent.disableNetConnect()
 agent.get("https://api.crisp.chat").intercept({
   method: "GET",
-  path: `/v1/website/${process.env.CRISPCTL_WEBSITE_ID}/connect/endpoints`,
+  path: process.env.CRISPCTL_TIER === "plugin" ? "/v1/plugin/connect/endpoints" : `/v1/website/${process.env.CRISPCTL_WEBSITE_ID}/connect/endpoints`,
   headers: {
-    "x-crisp-tier": "website",
+    "x-crisp-tier": process.env.CRISPCTL_TIER,
     authorization: `Basic ${Buffer.from(`${process.env.CRISPCTL_IDENTIFIER}:${process.env.CRISPCTL_KEY}`).toString("base64")}`,
   },
 }).reply(() => {

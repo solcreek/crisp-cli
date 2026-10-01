@@ -16,6 +16,7 @@ import { CrispApiError, exitCodeFor, UsageError } from "./errors.js"
 import { renderHelp, ROOT_HELP, usage } from "./help.js"
 import { writeErr, writeOut } from "./output.js"
 import { listen, parseEvents, positiveInteger, type SocketFactory } from "./rtm.js"
+import { RTM_EVENTS, RTM_REFERENCE_CHECKED, RTM_REFERENCE_URL } from "./rtm-events.js"
 import { redactSecrets } from "./redact.js"
 import { version } from "./version.js"
 
@@ -300,8 +301,13 @@ async function operatorsCommand(sub: string | undefined, rest: string[], seen: S
 }
 
 async function listenCommand(extra: string | undefined, seen: Set<string>, io: IO): Promise<number> {
-  assertAllowedFlags(seen, ["events", "session", "timeout", "count"])
+  assertAllowedFlags(seen, ["events", "session", "timeout", "count", "list-events"])
   if (extra !== undefined) throw new UsageError(`usage: ${usage.listen}`)
+  if (io.flags.listEvents) {
+    assertAllowedFlags(seen, ["list-events"])
+    writeOut(io.stdout, io.flags.json, { source: RTM_REFERENCE_URL, checked_at: RTM_REFERENCE_CHECKED, events: RTM_EVENTS })
+    return 0
+  }
   const events = parseEvents(io.flags.events)
   const count = positiveInteger(io.flags.count, "count")
   const timeout = positiveInteger(io.flags.timeout, "timeout")
