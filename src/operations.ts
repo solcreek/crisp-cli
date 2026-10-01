@@ -1,4 +1,4 @@
-import { assertAllowedFlags, pageNumber, requireArg, websiteOverride, type Flags } from "./args.js"
+import { pageNumber, requireArg, websiteOverride, type Flags } from "./args.js"
 import { CrispClient } from "./client.js"
 import {
   assertComplete,
@@ -21,24 +21,105 @@ import { RunLifecycle } from "./lifecycle.js"
 
 import type { IO } from "./context.js"
 
-export { authCommand, conversationsCommand, messagesCommand, replyCommand, stateCommand, assignCommand, segmentsCommand, readCommand, peopleCommand, operatorsCommand, listenCommand }
+export function authSet(io: IO): number {
+  assertWritable(io)
+  writeOut(io.stdout, io.flags.json, saveProfile(io.env, io.flags))
+  return 0
+}
 
-function authCommand(sub: string | undefined, rest: string[], seen: Set<string>, io: IO): number {
-  if (sub === "set") {
-    assertWritable(io)
-    assertAllowedFlags(seen, ["identifier", "key", "tier", "website-id"])
-    if (rest.length > 0) throw new UsageError(`usage: ${usage.authSet}`)
-    writeOut(io.stdout, io.flags.json, saveProfile(io.env, io.flags))
-    return 0
-  }
-  if (sub === "show") {
-    assertAllowedFlags(seen, [])
-    if (rest.length > 0) throw new UsageError(`usage: ${usage.authShow}`)
-    const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
-    writeOut(io.stdout, io.flags.json, publicProfileView(creds))
-    return 0
-  }
-  throw new UsageError("usage: crispctl auth <set|show>")
+export function authShow(io: IO): number {
+  const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
+  writeOut(io.stdout, io.flags.json, publicProfileView(creds))
+  return 0
+}
+
+export async function conversationsList(io: IO): Promise<number> {
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversations(pageNumber(io.flags.page)))
+  return 0
+}
+
+export async function conversationsGet(io: IO, sessionRaw?: string): Promise<number> {
+  const session = requireArg(sessionRaw, usage.conversationsGet)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).getConversation(session))
+  return 0
+}
+
+export async function conversationsSearch(io: IO, queryRaw?: string): Promise<number> {
+  const query = requireArg(queryRaw, usage.conversationsSearch)
+  const searchType = io.flags.searchType ?? "text"
+  if (searchType !== "text" && searchType !== "segment") throw new UsageError("--search-type must be text or segment")
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType))
+  return 0
+}
+
+export async function messagesList(io: IO, sessionRaw?: string): Promise<number> {
+  const session = requireArg(sessionRaw, usage.messagesList)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listMessages(session))
+  return 0
+}
+
+export async function replyCommand(io: IO, sessionRaw?: string): Promise<number> {
+  assertWritable(io)
+  const session = requireArg(sessionRaw, usage.reply)
+  const hasText = io.flags.text !== undefined
+  const hasNote = io.flags.note !== undefined
+  if (hasText === hasNote) throw new UsageError(`usage: ${usage.reply}`)
+  const content = hasText ? io.flags.text! : io.flags.note!
+  if (!content.trim()) throw new UsageError(`usage: ${usage.reply}`)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).sendOperatorMessage(session, hasText ? "text" : "note", content))
+  return 0
+}
+
+export function resolveCommand(io: IO, sessionRaw?: string): Promise<number> {
+  return stateCommand(io, "resolved", sessionRaw)
+}
+
+export function reopenCommand(io: IO, sessionRaw?: string): Promise<number> {
+  return stateCommand(io, "unresolved", sessionRaw)
+}
+
+async function stateCommand(io: IO, state: "resolved" | "unresolved", sessionRaw?: string): Promise<number> {
+  assertWritable(io)
+  const session = requireArg(sessionRaw, state === "resolved" ? usage.resolve : usage.reopen)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).setState(session, state))
+  return 0
+}
+
+export async function assignCommand(io: IO, sessionRaw?: string): Promise<number> {
+  assertWritable(io)
+  const session = requireArg(sessionRaw, usage.assign)
+  const hasUser = io.flags.user !== undefined
+  if (hasUser === io.flags.unassign) throw new UsageError(`usage: ${usage.assign}`)
+  const userId = hasUser ? requireArg(io.flags.user, usage.assign) : null
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).assign(session, userId))
+  return 0
+}
+
+export async function segmentsCommand(io: IO, sessionRaw?: string): Promise<number> {
+  assertWritable(io)
+  const session = requireArg(sessionRaw, usage.segments)
+  if (io.flags.set === undefined) throw new UsageError(`usage: ${usage.segments}`)
+  const segments = io.flags.set.split(",").map(part => part.trim()).filter(part => part.length > 0)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).setSegments(session, segments))
+  return 0
+}
+
+export async function readCommand(io: IO, sessionRaw?: string): Promise<number> {
+  assertWritable(io)
+  const session = requireArg(sessionRaw, usage.read)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).markRead(session))
+  return 0
+}
+
+export async function peopleGet(io: IO, idRaw?: string): Promise<number> {
+  const idOrEmail = requireArg(idRaw, usage.peopleGet)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).getPerson(idOrEmail))
+  return 0
+}
+
+export async function operatorsList(io: IO): Promise<number> {
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listOperators())
+  return 0
 }
 
 function saveProfile(env: NodeJS.ProcessEnv, flags: Flags): {
@@ -78,155 +159,11 @@ function saveProfile(env: NodeJS.ProcessEnv, flags: Flags): {
   return { saved: true, profile: name, identifier, tier, website_id: website }
 }
 
-async function conversationsCommand(sub: string | undefined, rest: string[], seen: Set<string>, io: IO): Promise<number> {
-  if (sub === "list") {
-    assertAllowedFlags(seen, ["page"])
-    if (rest.length > 0) throw new UsageError(`usage: ${usage.conversationsList}`)
-    writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversations(pageNumber(io.flags.page)))
-    return 0
-  }
-  if (sub === "get") {
-    assertAllowedFlags(seen, [])
-    const session = requireArg(rest[0], usage.conversationsGet)
-    if (rest.length > 1) throw new UsageError(`usage: ${usage.conversationsGet}`)
-    writeOut(io.stdout, io.flags.json, await clientFrom(io).getConversation(session))
-    return 0
-  }
-  if (sub === "search") {
-    assertAllowedFlags(seen, ["page", "search-type"])
-    const query = requireArg(rest[0], usage.conversationsSearch)
-    if (rest.length > 1) throw new UsageError(`usage: ${usage.conversationsSearch}`)
-    const searchType = io.flags.searchType ?? "text"
-    if (searchType !== "text" && searchType !== "segment") {
-      throw new UsageError("--search-type must be text or segment")
-    }
-    writeOut(
-      io.stdout,
-      io.flags.json,
-      await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType),
-    )
-    return 0
-  }
-  throw new UsageError("usage: crispctl conversations <list|get|search>")
-}
-
-async function messagesCommand(sub: string | undefined, rest: string[], seen: Set<string>, io: IO): Promise<number> {
-  if (sub !== "list") throw new UsageError(`usage: ${usage.messagesList}`)
-  assertAllowedFlags(seen, [])
-  const session = requireArg(rest[0], usage.messagesList)
-  if (rest.length > 1) throw new UsageError(`usage: ${usage.messagesList}`)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).listMessages(session))
-  return 0
-}
-
-async function replyCommand(
-  sessionRaw: string | undefined,
-  rest: string[],
-  seen: Set<string>,
-  io: IO,
-): Promise<number> {
-  assertWritable(io)
-  assertAllowedFlags(seen, ["text", "note"])
-  if (rest.length > 0) throw new UsageError(`usage: ${usage.reply}`)
-  const session = requireArg(sessionRaw, usage.reply)
-  const hasText = seen.has("text")
-  const hasNote = seen.has("note")
-  if (hasText === hasNote) throw new UsageError(`usage: ${usage.reply}`)
-  const content = hasText ? io.flags.text ?? "" : io.flags.note ?? ""
-  if (!content.trim()) throw new UsageError(`usage: ${usage.reply}`)
-  const kind = hasText ? "text" : "note"
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).sendOperatorMessage(session, kind, content))
-  return 0
-}
-
-async function stateCommand(
-  state: "resolved" | "unresolved",
-  sessionRaw: string | undefined,
-  rest: string[],
-  seen: Set<string>,
-  io: IO,
-): Promise<number> {
-  assertWritable(io)
-  const line = state === "resolved" ? usage.resolve : usage.reopen
-  assertAllowedFlags(seen, [])
-  if (rest.length > 0) throw new UsageError(`usage: ${line}`)
-  const session = requireArg(sessionRaw, line)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).setState(session, state))
-  return 0
-}
-
-async function assignCommand(
-  sessionRaw: string | undefined,
-  rest: string[],
-  seen: Set<string>,
-  io: IO,
-): Promise<number> {
-  assertWritable(io)
-  assertAllowedFlags(seen, ["user", "unassign"])
-  if (rest.length > 0) throw new UsageError(`usage: ${usage.assign}`)
-  const session = requireArg(sessionRaw, usage.assign)
-  const hasUser = seen.has("user")
-  if (hasUser === io.flags.unassign) throw new UsageError(`usage: ${usage.assign}`)
-  const userId = hasUser ? requireArg(io.flags.user, usage.assign) : null
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).assign(session, userId))
-  return 0
-}
-
-async function segmentsCommand(
-  sessionRaw: string | undefined,
-  rest: string[],
-  seen: Set<string>,
-  io: IO,
-): Promise<number> {
-  assertWritable(io)
-  assertAllowedFlags(seen, ["set"])
-  if (rest.length > 0) throw new UsageError(`usage: ${usage.segments}`)
-  const session = requireArg(sessionRaw, usage.segments)
-  if (!seen.has("set")) throw new UsageError(`usage: ${usage.segments}`)
-  const segments = (io.flags.set ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).setSegments(session, segments))
-  return 0
-}
-
-async function readCommand(
-  sessionRaw: string | undefined,
-  rest: string[],
-  seen: Set<string>,
-  io: IO,
-): Promise<number> {
-  assertWritable(io)
-  assertAllowedFlags(seen, [])
-  if (rest.length > 0) throw new UsageError(`usage: ${usage.read}`)
-  const session = requireArg(sessionRaw, usage.read)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).markRead(session))
-  return 0
-}
-
-async function peopleCommand(sub: string | undefined, rest: string[], seen: Set<string>, io: IO): Promise<number> {
-  if (sub !== "get") throw new UsageError(`usage: ${usage.peopleGet}`)
-  assertAllowedFlags(seen, [])
-  const idOrEmail = requireArg(rest[0], usage.peopleGet)
-  if (rest.length > 1) throw new UsageError(`usage: ${usage.peopleGet}`)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).getPerson(idOrEmail))
-  return 0
-}
-
-async function operatorsCommand(sub: string | undefined, rest: string[], seen: Set<string>, io: IO): Promise<number> {
-  if (sub !== "list") throw new UsageError(`usage: ${usage.operatorsList}`)
-  assertAllowedFlags(seen, [])
-  if (rest.length > 0) throw new UsageError(`usage: ${usage.operatorsList}`)
-  writeOut(io.stdout, io.flags.json, await clientFrom(io).listOperators())
-  return 0
-}
-
-async function listenCommand(extra: string | undefined, seen: Set<string>, io: IO): Promise<number> {
-  assertAllowedFlags(seen, ["events", "session", "timeout", "count", "list-events"])
-  if (extra !== undefined) throw new UsageError(`usage: ${usage.listen}`)
+export async function listenCommand(io: IO): Promise<number> {
   if (io.flags.listEvents) {
-    assertAllowedFlags(seen, ["list-events"])
+    for (const name of ["events", "session", "count", "timeout"] as const) {
+      if (io.flags[name] !== undefined) throw new UsageError(`unexpected flag: --${name}`)
+    }
     writeOut(io.stdout, io.flags.json, { source: RTM_REFERENCE_URL, checked_at: RTM_REFERENCE_CHECKED, events: RTM_EVENTS })
     return 0
   }
