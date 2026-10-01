@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs"
 import { pathToFileURL } from "node:url"
-import { run } from "./cli.js"
+import { runProcess } from "./process-cli.js"
 
 export function isDirectInvocation(entry = process.argv[1], moduleUrl = import.meta.url): boolean {
   if (!entry) return false
@@ -13,5 +13,5 @@ export function isDirectInvocation(entry = process.argv[1], moduleUrl = import.m
 }
 
 if (isDirectInvocation()) {
-  process.exitCode = await run(process.argv.slice(2))
+  process.exitCode = await runProcess(process.argv.slice(2), process.stdout, process.stderr)
 }

@@ -126,6 +126,12 @@ Connection status (`authenticated`, `reconnecting`) and errors go to stderr, als
 
 Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits successfully after N matching events; `--timeout S` sets a total deadline in seconds and exits 1 if reached. Without these flags, the listener runs until stopped.
 
+Output is written in order and drained before normal exit. Closing the stdout pipe
+(for example, a downstream reader stopping early) cancels listening cleanly.
+Pending output is limited to 8 MiB per stream; exceeding this limit stops the
+listener with exit 1 and an explicit error. Overflow can truncate pending output;
+it does not silently drop events and continue.
+
 ### Verify RTM with 1Password
 
 From a checkout with `op` connected to 1Password:

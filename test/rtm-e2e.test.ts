@@ -137,3 +137,61 @@ for (const tier of ["website", "plugin"] as const) {
     assert.equal(result.discoveries, 1)
   })
 }
+
+test("E2E closed stdout cancels RTM without an unhandled EPIPE", { timeout: 10_000 }, async t => {
+  let disconnected!: () => void
+  const closed = new Promise<void>(resolve => { disconnected = resolve })
+  const endpoint = await server(t, socket => {
+    socket.on("disconnect", disconnected)
+    socket.emit("authenticated")
+    socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "pipe closed" })
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--timeout", "5"])
+  child.stdout!.destroy()
+  const result = await completed
+  await closed
+  assert.equal(result.code, 0, result.stderr)
+  assert.doesNotMatch(result.stderr, /Unhandled|EPIPE|node:events/)
+})
+
+test("E2E slow stdout drains every ordered event before count exit", { timeout: 15_000 }, async t => {
+  const count = 150
+  const content = "保留".repeat(2048)
+  const endpoint = await server(t, socket => {
+    socket.emit("authenticated")
+    for (let sequence = 0; sequence < count; sequence++) {
+      socket.emit("message:send", { website_id: FIXTURE.websiteId, sequence, content })
+    }
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--count", String(count), "--timeout", "10"])
+  child.stdout!.pause()
+  const timer = setTimeout(() => child.stdout!.resume(), 300)
+  t.after(() => clearTimeout(timer))
+  const result = await completed
+  assert.equal(result.code, 0, result.stderr)
+  const events = result.stdout.trim().split("\n").map(line => JSON.parse(line))
+  assert.deepEqual(events.map(event => event.data.sequence), Array.from({ length: count }, (_, i) => i))
+  assert.ok(events.every(event => event.data.content === content))
+})
+
+test("E2E a stalled reader causes bounded-output failure and closes RTM", { timeout: 15_000 }, async t => {
+  let disconnected!: () => void
+  const closed = new Promise<void>(resolve => { disconnected = resolve })
+  const endpoint = await server(t, socket => {
+    socket.on("disconnect", disconnected)
+    socket.emit("authenticated")
+    for (let i = 0; i < 80; i++) socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "x".repeat(256 * 1024) })
+  })
+  const { child, completed } = cli(t, endpoint, ["listen", "--json", "--timeout", "10"])
+  child.stdout!.pause()
+  let stderr = ""
+  child.stderr!.on("data", chunk => {
+    stderr += chunk
+    if (stderr.includes("buffer exceeded")) child.stdout!.resume()
+  })
+  const result = await completed
+  await closed
+  assert.equal(result.code, 1, stderr)
+  assert.match(stderr, /stdout buffer exceeded 8388608 bytes/)
+  assert.doesNotMatch(stderr, /Unhandled|node:events/)
+})
