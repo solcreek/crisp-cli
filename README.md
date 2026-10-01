@@ -183,11 +183,14 @@ The REST opt-in above is for the **Cos Sandbox** website only. For explicitly au
 
 ## Release
 
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md), following [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Add user-facing changes to `Unreleased` as part of each feature or fix.
+
 Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC). There is no npm token in the repo or in GitHub Actions secrets.
 
-1. Set `version` in `package.json` (for example `0.1.0`).
-2. Tag that commit `vX.Y.Z`, matching the `version` field: `git tag v0.1.0 && git push origin v0.1.0`.
-3. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
+1. Set the release version in `package.json` and update `package-lock.json` to match.
+2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
+3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
+4. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
 
 Pull requests run `.github/workflows/ci.yml` (install, typecheck, test, no live call).
 
