@@ -1,8 +1,26 @@
 # crispctl
 
+[![npm version](https://img.shields.io/npm/v/crispctl)](https://www.npmjs.com/package/crispctl)
+[![CI](https://github.com/solcreek/crisp-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/solcreek/crisp-cli/actions/workflows/ci.yml)
+[![Node.js version](https://img.shields.io/node/v/crispctl)](https://github.com/solcreek/crisp-cli/blob/main/package.json)
+[![MIT license](https://img.shields.io/github/license/solcreek/crisp-cli)](LICENSE)
+
 Agent-friendly CLI over the [Crisp REST API](https://docs.crisp.chat/references/rest-api/v1/) and [RTM API](https://docs.crisp.chat/references/rtm-api/v1/) for support operations: reply, note, resolve, reopen, assign, segments, mark read, search, people, and operators.
 
 `crispctl` speaks HTTP to `https://api.crisp.chat/v1/` with Node's undici `fetch`. Routes match the official [`crisp-api`](https://github.com/crisp-im/node-crisp-api) resource paths. Tests mock that wire with undici `MockAgent`. The CLI does not wrap the SDK, so a test can assert the path and body without stubbing the SDK surface.
+
+## Terminal inbox with crisp-tui
+
+[**crisp-tui**](https://github.com/solcreek/crisp-tui) brings crispctl into an interactive terminal inbox. Browse and search conversations, send replies and internal notes, and resolve threads, with refreshes driven by RTM events. Agents can prepare drafts in the running inbox for human review.
+
+With [Bun](https://bun.sh/) and Node.js installed, try the demo without credentials:
+
+```bash
+npm install -g crisp-tui
+crisp-tui --demo
+```
+
+See the [crisp-tui README](https://github.com/solcreek/crisp-tui#readme) for installation requirements, keyboard shortcuts, read-only sessions and agent controls.
 
 ## Live access
 
