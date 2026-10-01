@@ -132,6 +132,14 @@ Pending output is limited to 8 MiB per stream; exceeding this limit stops the
 listener with exit 1 and an explicit error. Overflow can truncate pending output;
 it does not silently drop events and continue.
 
+After listening ends, each stream has up to 5 seconds to finish pending writes.
+The `--timeout` deadline also covers stdout draining, including after `--count`
+is reached. Ctrl-C / SIGTERM cancels a pending stdout drain. If output cannot be
+fully written because of cancellation, a deadline, or a stalled consumer, the
+CLI exits 1 and pending output may be truncated. Stderr has a separate bounded
+drain so it can report the failure. An earlier command failure retains its exit
+code even if a pipe closes afterward.
+
 ### Verify RTM with 1Password
 
 From a checkout with `op` connected to 1Password:

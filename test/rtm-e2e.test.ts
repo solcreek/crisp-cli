@@ -43,10 +43,41 @@ function cli(t: TestContext, endpoint: string, args: string[], tier: Tier = "web
   // Keep failed assertions from leaving a child or a live socket behind.
   t.after(async () => {
     if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
+    child.stdout!.resume()
+    child.stderr!.resume()
     await completed
     removeHome(env)
   })
   return { child, completed }
+}
+
+for (const mode of ["listen deadline", "count deadline", "count signal", "count drain limit"] as const) {
+test(`E2E ${mode} stops a stalled stdout reader below the buffer limit`, { timeout: 12_000 }, async t => {
+  const endpoint = await server(t, socket => {
+    socket.emit("authenticated")
+    socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "x".repeat(512 * 1024) })
+  })
+  const args = ["listen", "--json"]
+  if (mode.startsWith("count")) args.push("--count", "1")
+  if (mode.endsWith("deadline")) args.push("--timeout", "1")
+  const { child, completed } = cli(t, endpoint, args)
+  child.stdout!.pause()
+  // Observe process exit without draining its pipe; 'close' may await reader EOF.
+  const exit = once(child, "exit")
+  if (mode === "count signal") {
+    await once(child.stdout!, "readable")
+    child.kill("SIGTERM")
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const result = await Promise.race([exit, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), mode === "count drain limit" ? 8000 : 3500) })])
+    assert.ok(result, "process must exit even while the stdout reader remains stalled")
+    assert.equal(result[0], 1)
+    child.stdout!.resume()
+    assert.match((await completed).stderr, mode.endsWith("deadline") ? /deadline reached/
+      : mode === "count signal" ? /output drain cancelled/ : /output drain timed out/)
+  } finally { clearTimeout(timer) }
+})
 }
 
 test("E2E built listen uses WSS, filters events, reconnects and emits clean NDJSON", { timeout: 15_000 }, async t => {

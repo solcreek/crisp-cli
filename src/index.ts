@@ -13,5 +13,7 @@ export function isDirectInvocation(entry = process.argv[1], moduleUrl = import.m
 }
 
 if (isDirectInvocation()) {
-  process.exitCode = await runProcess(process.argv.slice(2), process.stdout, process.stderr)
+  // runProcess drains both streams before returning. After a cancelled drain,
+  // Node's special stdio handles can retain pending writes despite destroy().
+  process.exit(await runProcess(process.argv.slice(2), process.stdout, process.stderr))
 }

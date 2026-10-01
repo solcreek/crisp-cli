@@ -20,15 +20,16 @@ export function writeOut(stdout: (chunk: string) => void, json: boolean, value: 
 
 export function errorPayload(err: unknown, secrets: readonly (string | undefined)[]): ErrorPayload {
   if (err instanceof CrispApiError) {
+    const reason = redactSecrets(err.reason, secrets)
     const payload: ErrorPayload = {
       ok: false,
-      error: err.reason,
+      error: reason,
       status: err.status,
-      reason: err.reason,
+      reason,
       message: redactSecrets(err.message, secrets),
     }
     if (err.retryAfter) {
-      payload.retry_after = err.retryAfter
+      payload.retry_after = redactSecrets(err.retryAfter, secrets)
     }
     return payload
   }
