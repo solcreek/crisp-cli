@@ -41,7 +41,8 @@ lines(child.stderr, status => {
   console.log(JSON.stringify({ check: "status", status: status.status, error: status.error }))
 })
 child.on("error", () => { console.error("Could not start CLI"); process.exitCode = 1 })
-child.on("exit", code => {
+// Wait for stdout/stderr to drain before counting the final event.
+child.on("close", code => {
   console.log(JSON.stringify({ check: "result", exit_code: code, received_events: received }))
   process.exitCode = code === 0 && received > 0 ? 0 : 1
 })
