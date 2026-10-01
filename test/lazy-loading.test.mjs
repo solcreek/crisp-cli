@@ -37,6 +37,7 @@ test("cancellation during a cold HTTP import prevents dispatch", async () => {
       ),
       (error) => {
         assert.equal(error.code, 1)
+        assert.equal(error.killed, false)
         assert.equal(error.stdout, "")
         assert.equal(JSON.parse(error.stderr).error, "network_error")
         assert.doesNotMatch(error.stderr, /unexpected fetch/)
