@@ -7,6 +7,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-01
+
 ### Added
 
 - RTM event streaming with `listen --json`, website and plugin token authentication,
@@ -31,5 +33,6 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Named authentication profiles, environment overrides, JSON output, and
   credential redaction in errors.
 
-[Unreleased]: https://github.com/solcreek/crisp-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/solcreek/crisp-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/solcreek/crisp-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/solcreek/crisp-cli/releases/tag/v0.1.0
