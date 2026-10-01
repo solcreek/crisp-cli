@@ -1,4 +1,4 @@
-import { fetch as undiciFetch, type Dispatcher } from "undici"
+import type { fetch as undiciFetch, Dispatcher } from "undici"
 import { decodeResponse, readResponseText, statusReason } from "./response.js"
 import { CrispApiError, UsageError } from "./errors.js"
 import type { Tier } from "./config.js"
@@ -177,7 +177,9 @@ export class CrispClient {
     try {
       const signal = AbortSignal.any(signals)
       signal.throwIfAborted()
-      response = await undiciFetch(url, {
+      const { fetch } = await import("undici")
+      signal.throwIfAborted()
+      response = await fetch(url, {
         method,
         headers,
         body,

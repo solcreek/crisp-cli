@@ -13,6 +13,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   configuration, read-only rejection and HTTP errors; measure warm command,
   configuration, response, redaction and output-queue batches separately.
 
+### Changed
+
+- Load command operations and network transports only when needed, reducing
+  help, configuration and validation startup costs while preserving cancellation
+  across asynchronous module loading.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added
