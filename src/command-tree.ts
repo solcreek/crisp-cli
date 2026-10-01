@@ -112,7 +112,7 @@ export function createCommandTree() {
       // safer spelling: use --text=--literal when a value begins with two dashes.
       for (let index = 0; index < argv.length; index++) {
         if (argv[index] === "--") break
-        const option = optionDefinitions.find(option => option.long === argv[index])
+        const option = optionDefinitions.find(candidate => candidate.long === argv[index])
         if (option?.required) {
           if (argv[index + 1]?.startsWith("--")) throw new UsageError(`${option.long} requires a value`)
           index++
@@ -132,7 +132,7 @@ export function createCommandTree() {
     help(path: readonly string[]): string {
       let command = root
       for (const name of path) {
-        const child = command.commands.find(child => child.name() === name)
+        const child = command.commands.find(candidate => candidate.name() === name)
         if (!child) break
         command = child
       }

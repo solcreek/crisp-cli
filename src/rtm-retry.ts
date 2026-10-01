@@ -28,7 +28,7 @@ function canonicalHttpDate(value: string): number {
 // Node timers overflow above this value. Long server delays must not retry early.
 export async function waitForRetry(
   ms: number, signal: AbortSignal,
-  sleep: (ms: number, signal: AbortSignal) => Promise<void> = (ms, signal) => delay(ms, undefined, { signal }),
+  sleep: (duration: number, cancellation: AbortSignal) => Promise<void> = (duration, cancellation) => delay(duration, undefined, { signal: cancellation }),
 ): Promise<void> {
   while (ms > 0) {
     signal.throwIfAborted()

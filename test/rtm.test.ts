@@ -263,7 +263,7 @@ test("future event names pass through without weakening website isolation", asyn
     socket.receive(event, { website_id: creds.websiteId })
   })
   await listen({ getConnectEndpoints: async () => endpoint }, creds, options(h.factory, {
-    events: parseEvents(event), count: 1, onEvent: event => received.push(event.data),
+    events: parseEvents(event), count: 1, onEvent: receivedEvent => received.push(receivedEvent.data),
   }))
   assert.deepEqual(received, [{ website_id: creds.websiteId }])
 })

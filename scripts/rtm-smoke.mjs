@@ -14,7 +14,7 @@ try {
   // execFileSync errors can contain partial credential stdout/stderr.
   throw new Error("1Password credential lookup failed or timed out")
 }
-const field = label => item.fields.find(field => field.label === label)?.value
+const field = label => item.fields.find(entry => entry.label === label)?.value
 const identifier = field("API Identifier")
 const key = field("API Key")
 const websiteId = field("website_id")

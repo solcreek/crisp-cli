@@ -101,7 +101,7 @@ export async function withCrispMock(
         responseOptions: {
           headers: {
             "content-type": "application/json",
-            ...(current?.headers ?? {}),
+            ...current?.headers,
           },
         },
       }
