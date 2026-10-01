@@ -9,6 +9,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Redact credentials from API error reasons and Retry-After values as well as
+  messages, in both JSON and text diagnostics.
 - Keep the listen deadline and cancellation active while stdout drains; bound
   each stream's final drain to 5 seconds so a stalled consumer cannot prevent
   exit, and report incomplete output as a failure.
