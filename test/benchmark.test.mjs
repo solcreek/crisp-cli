@@ -87,6 +87,23 @@ test("benchmark uses nearest-rank tail percentiles without mutating samples", ()
   for (const invalid of [[], [-1], [NaN], [Infinity]]) assert.throws(() => summarize(invalid))
 })
 
+test("output soak validates every record and reports post-GC samples without a timing gate", async () => {
+  const script = fileURLToPath(new URL("../scripts/benchmark-output-soak.mjs", import.meta.url))
+  const { stdout, stderr } = await promisify(execFile)(process.execPath, ["--expose-gc", script], {
+    env: {},
+    timeout: 10000,
+  })
+  assert.equal(stderr, "")
+  const report = JSON.parse(stdout)
+  assert.equal(report.measuredRecords, 100000)
+  assert.equal(report.warmupRecords, 5000)
+  assert.deepEqual(
+    report.snapshots.map((sample) => sample.received),
+    [5000, 25000, 45000, 65000, 85000, 105000],
+  )
+  assert.ok(report.snapshots.every((sample) => sample.heapUsedMiB > 0 && sample.rssMiB > 0))
+})
+
 test("benchmark measures stderr feedback and retains unsuccessful exits for validation", async () => {
   const result = await child('console.error("synthetic error"); process.exitCode = 2', {
     outputStream: "stderr",

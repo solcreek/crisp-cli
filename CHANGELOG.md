@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Measure a reused output pipeline over 100,000 validated records with periodic
+  GC memory samples using `npm run bench:soak`.
+
 - Compare built checkouts with the same benchmark fixtures, including stored
   configuration, read-only rejection and HTTP errors; measure warm command,
   configuration, response, redaction and output-queue batches separately.

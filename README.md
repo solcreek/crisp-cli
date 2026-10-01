@@ -287,6 +287,7 @@ npm run bench
 npm run --silent bench -- --json > /tmp/crispctl-benchmark.json
 npm run bench -- --scenario help --scenario rtm-cancel --samples 50
 npm run bench:stages
+npm run bench:soak
 ```
 
 Reports include raw samples, p50/p95 latency, first output, peak RSS, CPU time,
@@ -297,6 +298,8 @@ timing thresholds are not imposed on shared runners. See
 `node scripts/benchmark.mjs --target /path/to/built-checkout --json` measures another
 build with the same fixtures. `bench:stages` isolates warm command-tree construction,
 configuration, body decoding, redaction and output-queue costs in validated batches.
+`bench:soak` reuses one output pipeline for 100,000 records and reports heap/RSS
+samples after forced GC. It measures the local output pipeline, without networking.
 
 ### Live smoke
 
