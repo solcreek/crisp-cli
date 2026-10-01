@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Verify published npm versions with bounded registry polling and an installed
+  executable smoke test; allow verification-only reruns without republishing.
+
 ### Changed
 
 - Enforce Oxfmt formatting and Oxlint correctness checks in local verification,

@@ -192,7 +192,8 @@ from pinned dev dependencies; no Rust installation is needed. `npm run fmt:check
 checks formatting without changing files, and `npm run lint:fix` applies safe lint
 fixes. Warnings fail the lint gate. Generated build/coverage files and npm's
 lockfile are excluded from formatting, as is the captured RTM reference snapshot.
-TypeScript remains responsible for type checking and building the CLI.
+TypeScript remains responsible for type checking and building the CLI. Each build
+cleans `dist/` first and emits nothing if compilation fails.
 
 The mechanical formatting commit is recorded in `.git-blame-ignore-revs`. Use
 `git blame --ignore-revs-file .git-blame-ignore-revs <file>` to see the preceding
@@ -206,19 +207,24 @@ Commander defines the command tree and generates help in `src/command-tree.ts`.
 read-only mode before writes. REST, RTM, output and lifecycle code remain separate
 from the command framework. CLI compatibility tests cover option placement,
 literal values, help, concurrent invocations and credential redaction on errors.
+Each invocation lazily snapshots its credentials so rotating configuration cannot
+expose a previously used key in diagnostics. REST requests and response bodies
+honor cancellation, including SIGINT/SIGTERM in the executable. Cancellation
+prevents subsequent requests; a write already sent to Crisp may have taken effect.
 
 `npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM coverage gate and
 `test:package`. The package smoke installs an actual tarball into a temporary
 directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
 
-| Layer                     | What it verifies                                                                                                                                                                        | Included in CI |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| Unit                      | Argument parsing, config, redaction, RTM filtering/retry/cancellation, write rejection                                                                                                  | Yes            |
-| HTTP integration          | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors                                                                                                    | Yes            |
-| CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes            |
-| Live smoke                | Real Crisp REST or RTM, explicitly enabled locally                                                                                                                                      | No             |
-| Package smoke             | Install the packed artifact and execute its installed bin                                                                                                                               | Yes            |
+| Layer                     | What it verifies                                                                                                                                                                        | Included in CI   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Unit                      | Argument parsing, config, redaction, RTM filtering/retry/cancellation, write rejection                                                                                                  | Yes              |
+| HTTP integration          | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors                                                                                                    | Yes              |
+| CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes              |
+| Release smoke             | Wait for the exact npm version, install it from the public registry and execute its bin                                                                                                 | After publishing |
+| Live smoke                | Real Crisp REST or RTM, explicitly enabled locally                                                                                                                                      | No               |
+| Package smoke             | Install the packed artifact and execute its installed bin                                                                                                                               | Yes              |
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
@@ -266,6 +272,16 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
 4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including formatting, lint, typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
+5. The separate `verify-published` job polls public npm metadata for up to 45 minutes,
+   then installs the exact published version and checks its executable, help, event
+   catalog and JSON error exit. No Crisp credentials or OIDC write permissions are
+   needed for this job.
+
+An accepted publication can take time to become downloadable. If registry or
+installation verification fails, inspect its result and rerun **Verify Published
+Package** with the exact version, or run `npm run test:published -- X.Y.Z` locally.
+This verification never republishes or changes dist-tags. It is separate from the
+offline test suite; polling failures and deadlines are tested with local fixtures.
 
 Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
 `.github/workflows/verify.yml` as releases. No live Crisp calls are included.
