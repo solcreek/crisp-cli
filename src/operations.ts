@@ -34,11 +34,8 @@ export function authShow(io: IO): number {
 }
 
 export async function conversationsList(io: IO): Promise<number> {
-  writeOut(
-    io.stdout,
-    io.flags.json,
-    await clientFrom(io).listConversations(pageNumber(io.flags.page)),
-  )
+  const page = pageNumber(io.flags.page)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversations(page))
   return 0
 }
 
@@ -50,13 +47,14 @@ export async function conversationsGet(io: IO, sessionRaw?: string): Promise<num
 
 export async function conversationsSearch(io: IO, queryRaw?: string): Promise<number> {
   const query = requireArg(queryRaw, usage.conversationsSearch)
+  const page = pageNumber(io.flags.page)
   const searchType = io.flags.searchType ?? "text"
   if (searchType !== "text" && searchType !== "segment")
     throw new UsageError("--search-type must be text or segment")
   writeOut(
     io.stdout,
     io.flags.json,
-    await clientFrom(io).searchConversations(query, pageNumber(io.flags.page), searchType),
+    await clientFrom(io).searchConversations(query, page, searchType),
   )
   return 0
 }

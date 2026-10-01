@@ -20,6 +20,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Validate conversation page arguments before resolving credentials, keeping
+  invalid arguments as usage errors even with missing or malformed configuration.
 - Redact RTM string values and property names during JSON serialization, preserving
   escaped credentials, numeric fields and valid NDJSON output.
 - Reject release verification inputs with leading zeroes in numeric prerelease

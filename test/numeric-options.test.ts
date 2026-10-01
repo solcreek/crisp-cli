@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { writeFileSync } from "node:fs"
+import { configFilePath, saveConfig } from "../src/config.js"
 import { pageNumber } from "../src/args.js"
 import { run } from "../src/cli.js"
 import { buffers, credentialEnv, okEnvelope, removeHome, withCrispMock } from "./support.js"
@@ -79,3 +81,39 @@ test("safe maximum page is sent without loss of precision", async () => {
     removeHome(env)
   }
 })
+
+for (const state of ["missing", "invalid"]) {
+  test(`invalid numeric options remain usage errors with ${state} credentials`, async () => {
+    const env = credentialEnv({
+      CRISP_IDENTIFIER: undefined,
+      CRISP_KEY: undefined,
+      CRISP_TIER: undefined,
+      CRISP_WEBSITE_ID: undefined,
+    })
+    try {
+      if (state === "invalid") {
+        saveConfig(env, { profiles: {} })
+        writeFileSync(configFilePath(env), "{invalid JSON")
+      }
+      for (const argv of [
+        ["conversations", "list", "--page=0"],
+        ["conversations", "search", "hello", "--page=9007199254740993"],
+        ["listen", "--count=0"],
+        ["listen", "--timeout=0"],
+      ]) {
+        const io = buffers()
+        const calls = await withCrispMock(
+          { status: 200, json: okEnvelope([]) },
+          async (dispatcher) => {
+            assert.equal(await run([...argv, "--json"], { ...io, env, dispatcher }), 2)
+          },
+        )
+        assert.equal(JSON.parse(io.err()).error, "usage", argv.join(" "))
+        assert.equal(io.out(), "")
+        assert.equal(calls.length, 0)
+      }
+    } finally {
+      removeHome(env)
+    }
+  })
+}
