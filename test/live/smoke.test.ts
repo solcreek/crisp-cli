@@ -28,12 +28,7 @@ test(
   async () => {
     const creds = resolveCredentials(process.env, {})
     assertComplete(creds)
-    const client = new CrispClient({
-      identifier: creds.identifier,
-      key: creds.key,
-      tier: creds.tier,
-      websiteId: creds.websiteId,
-    })
+    const client = new CrispClient(creds, undefined, true)
     const operators = await client.listOperators()
     assert.ok(Array.isArray(operators), "operators list should be an array")
   },

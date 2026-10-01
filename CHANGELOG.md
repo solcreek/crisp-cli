@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add a separately opted-in sandbox write check for synthetic notes, RTM delivery,
+  state readback, API errors and cleanup after verifying the website identity.
+
 - Verify installed `conversations pages` help, required arguments and page
   validation without credentials in local and published-package smoke checks.
 

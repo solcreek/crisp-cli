@@ -306,6 +306,13 @@ export CRISPCTL_LIVE=1
 npm run test:live
 ```
 
+A separate synthetic write check requires **both** the REST opt-in and
+`CRISPCTL_LIVE_WRITE=1`, plus `CRISPCTL_LIVE_WEBSITE_NAME` matching the dedicated
+sandbox. It creates its own conversation, verifies note delivery over RTM, reads
+back state changes, checks API validation errors and deletes that conversation in
+`finally`. It never edits existing conversations or generates API credentials.
+This write check is for a dedicated sandbox only; it remains disabled in CI.
+
 The REST opt-in above is for a dedicated test website only. For explicitly authorized production RTM verification, use the read-only 1Password flow. Do not commit tokens or add them as CI secrets. CI runs `npm test` without live flags.
 
 ## Release
