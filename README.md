@@ -150,9 +150,15 @@ Unit and HTTP contract tests use undici [`MockAgent`](https://undici.nodejs.org/
 ```bash
 npm test
 npm run typecheck
+npm run verify
 ```
 
 `npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 20 and 24. No Crisp credentials or external services are needed.
+
+`npm run verify` runs typecheck, offline tests, the RTM coverage gate and
+`test:package`. The package smoke installs an actual tarball into a temporary
+directory and checks its executable, version, help, event catalog and error exit.
+It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 | Layer | What it verifies | Included in CI |
 | --- | --- | --- |
@@ -160,6 +166,7 @@ npm run typecheck
 | HTTP integration | Real undici requests against MockAgent: methods, paths, headers, bodies, HTTP errors | Yes |
 | CLI E2E / RTM integration | Built CLI child process + real local WSS Socket.IO server: authentication, NDJSON, site/session filtering, reconnect/discovery, unauthorized exit, SIGTERM cleanup, read-only rejection | Yes |
 | Live smoke | Real Crisp REST or RTM, explicitly enabled locally | No |
+| Package smoke | Install the packed artifact and execute its installed bin | Yes |
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
@@ -199,9 +206,10 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`, on Node 24, with `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the `version` in `package.json` (`vX.Y.Z` for version `X.Y.Z`). It then runs `npm ci`, `npm run build`, `npm test`, and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 20 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 
-Pull requests run `.github/workflows/ci.yml` (install, typecheck, test, no live call).
+Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
+`.github/workflows/verify.yml` as releases. No live Crisp calls are included.
 
 ## License
 

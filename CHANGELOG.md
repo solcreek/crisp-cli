@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Require shared Node 20/24 verification before publishing, including typecheck,
+  both coverage gates and a smoke test of the installed npm tarball.
+
 ### Fixed
 
 - Honor discovery `Retry-After` headers, add jitter to reconnect delays, and keep
