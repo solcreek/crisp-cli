@@ -1,6 +1,5 @@
 import { fetch as undiciFetch, type Dispatcher } from "undici"
-import { Readable } from "node:stream"
-import { text as readText } from "node:stream/consumers"
+import { decodeResponse, readResponseText, statusReason } from "./response.js"
 import { CrispApiError, UsageError } from "./errors.js"
 import type { Tier } from "./config.js"
 import { version } from "./version.js"
@@ -15,12 +14,6 @@ export type ClientCredentials = {
 }
 
 type Query = Record<string, string | undefined>
-
-type Envelope = {
-  error?: boolean
-  reason?: string
-  data?: unknown
-}
 
 export class CrispClient {
   constructor(
@@ -192,10 +185,9 @@ export class CrispClient {
         dispatcher: this.dispatcher,
         signal,
       })
-      // Keep cancellation attached to the body reader even if fetch's internal
-      // Request/AbortController is collected after headers have arrived.
-      text = response.body ? await readText(Readable.fromWeb(response.body, { signal })) : ""
+      text = await readResponseText(response, signal)
     } catch (err) {
+      if (err instanceof CrispApiError) throw err
       if (response && response.status >= 400) {
         throw new CrispApiError(
           response.status,
@@ -213,74 +205,10 @@ export class CrispClient {
       for (const source of signals) source.removeEventListener("abort", retainTimeout)
     }
 
-    const retryAfter = response.headers.get("retry-after") ?? undefined
-    let payload: Envelope | null = null
-    if (text.length > 0) {
-      let decoded: unknown
-      try {
-        decoded = JSON.parse(text)
-      } catch {
-        if (response.status >= 400) {
-          throw new CrispApiError(
-            response.status,
-            statusReason(response.status),
-            `HTTP ${response.status}`,
-            retryAfter,
-          )
-        }
-        throw new CrispApiError(
-          response.status,
-          "invalid_json",
-          "response was not JSON",
-          retryAfter,
-        )
-      }
-      if (!isEnvelope(decoded)) {
-        throw new CrispApiError(
-          response.status,
-          "invalid_json",
-          "response was not a JSON object",
-          retryAfter,
-        )
-      }
-      payload = decoded
-    }
-
-    if (response.status >= 400 || payload?.error === true) {
-      const reason =
-        typeof payload?.reason === "string" && payload.reason
-          ? payload.reason
-          : statusReason(response.status)
-      const dataMessage = readDataMessage(payload?.data)
-      throw new CrispApiError(response.status, reason, dataMessage || reason, retryAfter)
-    }
-
-    if (payload && "data" in payload) {
-      return payload.data ?? null
-    }
-    return null
+    return decodeResponse(text, response.status, response.headers.get("retry-after") ?? undefined)
   }
-}
-
-function isEnvelope(value: unknown): value is Envelope {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+$/.test(value)
-}
-
-function statusReason(status: number): string {
-  if (status === 429) return "rate_limited"
-  if (status === 401 || status === 403) return "unauthorized"
-  if (status === 404) return "not_found"
-  return "http_error"
-}
-
-function readDataMessage(data: unknown): string {
-  if (!data || typeof data !== "object" || !("message" in data)) {
-    return ""
-  }
-  const message = (data as { message?: unknown }).message
-  return typeof message === "string" ? message : ""
 }

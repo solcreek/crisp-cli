@@ -45,6 +45,8 @@ for (const mode of [
   "bin-failure",
   "wrong-version",
   "missing-option",
+  "missing-pages-option",
+  "pages-accepts-invalid",
   "invalid-json",
   "missing-event",
   "duplicate-event",

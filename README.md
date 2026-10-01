@@ -175,6 +175,11 @@ Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits succ
 
 Output is written in order and drained before normal exit. Closing the stdout pipe
 (for example, a downstream reader stopping early) cancels listening cleanly.
+REST response bodies are limited to 8 MiB after decompression, including chunked
+responses. Oversized successful responses fail with `response_too_large`; HTTP
+errors retain their status classification and `Retry-After`. Malformed envelope
+fields fail validation, while unknown fields and arbitrary `data` remain accepted.
+
 Pending output is limited to 8 MiB per stream; exceeding this limit stops the
 listener with exit 1 and an explicit error. Overflow can truncate pending output;
 it does not silently drop events and continue.
@@ -196,7 +201,7 @@ npm run build
 node scripts/rtm-smoke.mjs "<expected website name>"
 ```
 
-The script reads `Crisp API Credentials` (`API Identifier`, `API Key`, `website_id`) using the real `op` CLI, verifies the website name via a GET request, and runs the built CLI with a website token and `--read-only --json --count 1 --timeout 60`. It only receives events; it never creates a test message or changes a conversation. It reports event names and payload field names, without customer content or credentials. Credentials remain in memory and the child environment. A successful check requires an actual website event, not just authentication; a quiet website can time out.
+Set `CRISPCTL_LIVE_OP_ITEM` and optionally `CRISPCTL_LIVE_OP_VAULT` to select a different 1Password API-token item. By default, the script reads `Crisp API Credentials` (`API Identifier` / `token_identifier`, `API Key` / `token_key`, and `website_id`) using the real `op` CLI, verifies the website name via a GET request, and runs the built CLI with a website token and `--read-only --json --count 1 --timeout 60`. It only receives events; it never creates a test message or changes a conversation. It reports only assertion results and counts, without website names, event payloads, customer content or credentials. A parent watchdog terminates stalled children; malformed, oversized or truncated NDJSON fails the check. Credentials remain in memory and the child environment. A successful check requires an actual website event, not just authentication; a quiet website can time out.
 
 ## Testing
 
@@ -258,14 +263,17 @@ It may download dependencies from npm; it never accesses Crisp or 1Password.
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
-Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and is checked on every CI Node version. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
+Aggregate coverage is enforced across all runtime `src/` files, including unimported files (type-only `.d.ts` declarations are not executable): **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and is checked on every CI Node version. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
 
-The registry, installed-package and published-package verification helpers also
+The registry, installed-package, published-package and RTM stream-monitor helpers also
 use TypeScript `checkJs` with JSDoc contracts. `npm run test:tooling` exercises them
 with offline subprocess fixtures and enforces **95% lines/statements, 100%
 functions and 90% branches** independently of `src/` coverage. Cases include
 installation failure, wrong executable versions, malformed or inconsistent event
-catalogs, invalid exit codes, credential isolation and temporary-directory cleanup.
+catalogs, invalid exit codes, installed conversation-page argument validation,
+credential isolation and temporary-directory cleanup. RTM monitor tests cover
+UTF-8 boundaries, malformed/truncated/oversized NDJSON, spawn and stream errors,
+signal cleanup and watchdog escalation. Live checks remain separately opt-in.
 
 ### Live smoke
 
@@ -297,6 +305,13 @@ export CRISP_TIER=website
 export CRISPCTL_LIVE=1
 npm run test:live
 ```
+
+A separate synthetic write check requires **both** the REST opt-in and
+`CRISPCTL_LIVE_WRITE=1`, plus `CRISPCTL_LIVE_WEBSITE_NAME` matching the dedicated
+sandbox. It creates its own conversation, verifies note delivery over RTM, reads
+back state changes, checks API validation errors and deletes that conversation in
+`finally`. It never edits existing conversations or generates API credentials.
+This write check is for a dedicated sandbox only; it remains disabled in CI.
 
 The REST opt-in above is for a dedicated test website only. For explicitly authorized production RTM verification, use the read-only 1Password flow. Do not commit tokens or add them as CI secrets. CI runs `npm test` without live flags.
 

@@ -252,3 +252,23 @@ test("saveConfig does not chmod an existing parent of CRISPCTL_CONFIG", () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+for (const mode of ["read", "rename", "cleanup"]) {
+  test(`config ${mode} failure preserves safe diagnostics and existing credentials`, async () => {
+    const { execFile } = await import("node:child_process")
+    const { promisify } = await import("node:util")
+    const { fileURLToPath } = await import("node:url")
+    const result = await promisify(execFile)(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        fileURLToPath(new URL("./fixtures/config-faults.mjs", import.meta.url)),
+        mode,
+      ],
+      { timeout: 5000, env: { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE } },
+    )
+    assert.equal(result.stdout, "")
+    assert.equal(result.stderr, "")
+  })
+}

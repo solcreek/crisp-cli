@@ -46,6 +46,9 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
     const replyHelp = run(["reply", "--help"])
     for (const flag of ["--text", "--note", "--json", "--read-only"])
       assert.ok(replyHelp.includes(flag), flag)
+    const pagesHelp = run(["conversations", "pages", "--help"])
+    for (const text of ["<session>", "--page", "--json", "--read-only"])
+      assert.ok(pagesHelp.includes(text), text)
     const events = JSON.parse(run(["listen", "--list-events", "--json"])).events
     assert.ok(Array.isArray(events) && events.some((entry) => entry.event === "message:send"))
     assert.ok(
@@ -59,16 +62,23 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
     assert.equal(new Set(events.map((entry) => entry.event)).size, events.length)
     if (expectedEvents) assert.deepEqual(events, expectedEvents)
     assert.deepEqual(JSON.parse(run(["--list-events", "--json", "listen"])).events, events)
-    const invalid = spawnSync(bin, ["unknown", "--json"], {
-      cwd: directory,
-      env,
-      encoding: "utf8",
-      timeout: 10_000,
-    })
-    assert.ifError(invalid.error)
-    assert.equal(invalid.status, 2)
-    assert.equal(invalid.stdout, "")
-    assert.equal(JSON.parse(invalid.stderr).error, "usage")
+    for (const args of [
+      ["unknown", "--json"],
+      ["conversations", "pages", "--json"],
+      ["conversations", "pages", "fixture-session", "extra", "--json"],
+      ["conversations", "pages", "fixture-session", "--page", "0", "--json"],
+    ]) {
+      const invalid = spawnSync(bin, args, {
+        cwd: directory,
+        env,
+        encoding: "utf8",
+        timeout: 10_000,
+      })
+      assert.ifError(invalid.error)
+      assert.equal(invalid.status, 2)
+      assert.equal(invalid.stdout, "")
+      assert.equal(JSON.parse(invalid.stderr).error, "usage")
+    }
     return { check: "installed-package", version, events: events.length, passed: true }
   } finally {
     rmSync(directory, { recursive: true, force: true })

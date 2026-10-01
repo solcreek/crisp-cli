@@ -9,6 +9,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add a separately opted-in sandbox write check for synthetic notes, RTM delivery,
+  state readback, API errors and cleanup after verifying the website identity.
+
+- Verify installed `conversations pages` help, required arguments and page
+  validation without credentials in local and published-package smoke checks.
+
 - Query recorded browsing history with `conversations pages <session> [--page n]`,
   including JSON output and read-only access, and document the companion RTM event.
 - Type-check the registry and installed-package verification scripts, enforce
@@ -18,6 +24,13 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   executable smoke test; allow verification-only reruns without republishing.
 
 ### Changed
+
+- Keep the type-only command context as a shipped declaration, avoiding phantom
+  runtime coverage, and test config I/O failures and deadlines during output drain.
+
+- Coordinate garbage-collection cancellation regressions with response-body
+  progress, including native deadlines through the full REST client, and verify
+  that cancellation closes the underlying HTTP transport.
 
 - Type-check command names, option names and help-note completeness from shared
   metadata, with help verification for every command.
@@ -29,6 +42,22 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   formatting baseline recorded for Git blame.
 
 ### Fixed
+
+- Reject empty or whitespace-only event names in the RTM smoke monitor so
+  malformed records cannot count as verified event delivery.
+
+- Subscribe to `message:received` for operator notes in the sandbox live write
+  check, with a full offline regression over local TLS and Socket.IO.
+
+- Accept `token_identifier` and `token_key` field names in 1Password API-token
+  items used by the opt-in RTM smoke check.
+
+- Bound and validate live-smoke NDJSON, terminate stalled child processes and
+  emit assertion metadata only; type-check and enforce coverage on the monitor.
+
+- Validate REST envelope field types and preserve HTTP error classification and
+  retry metadata for malformed responses; bound decoded response bodies to 8 MiB
+  and cancel oversized streams before JSON parsing.
 
 - Keep REST timeouts and cancellation effective during response body consumption
   under garbage collection, including on the minimum supported Node.js version.

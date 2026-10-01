@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process"
 import { test } from "node:test"
 import { fileURLToPath } from "node:url"
 
-function smoke(withEvent: boolean, mode = "event", authenticated = true) {
+function smoke(withEvent: boolean, mode = "event", authenticated = true, customItem = false) {
   const child = spawnSync(
     process.execPath,
     [
@@ -18,6 +18,9 @@ function smoke(withEvent: boolean, mode = "event", authenticated = true) {
       timeout: 5000,
       env: {
         ...process.env,
+        CRISPCTL_LIVE_OP_ITEM: customItem ? "Synthetic API Token" : "",
+        CRISPCTL_LIVE_OP_VAULT: customItem ? "Fixture Vault" : "",
+        SMOKE_FIXTURE_CUSTOM_ITEM: customItem ? "1" : "0",
         SMOKE_FIXTURE_EVENT: withEvent ? "1" : "0",
         SMOKE_FIXTURE_AUTH: authenticated ? "1" : "0",
       },
@@ -103,4 +106,8 @@ test("credential lookup failures never print captured credential output", () => 
   assert.equal(child.status, 1)
   assert.match(child.stderr, /1Password credential lookup failed or timed out/)
   assert.doesNotMatch(`${child.stdout}${child.stderr}`, /fixture-secret/)
+})
+
+test("smoke accepts token_identifier/token_key in an explicit API-token item and vault", () => {
+  assert.equal(smoke(false, "auth", true, true).code, 0)
 })

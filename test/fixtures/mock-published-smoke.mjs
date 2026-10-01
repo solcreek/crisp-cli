@@ -34,6 +34,8 @@ childProcess.execFileSync = (command, args, options) => {
   if (args[0] === "--help") return "listen\n"
   if (args[0] === "reply")
     return mode === "missing-option" ? "--text\n" : "--text --note --json --read-only\n"
+  if (args[0] === "conversations")
+    return mode === "missing-pages-option" ? "<session>" : "<session> --page --json --read-only"
   if (mode === "invalid-json") return "{bad JSON"
   const catalog =
     mode === "missing-event"
@@ -49,10 +51,13 @@ childProcess.execFileSync = (command, args, options) => {
               : events
   return JSON.stringify({ events: catalog })
 }
-childProcess.spawnSync = (command) => {
+childProcess.spawnSync = (command, args) => {
   assert.equal(command, join(directory, "node_modules/.bin/crispctl"))
   return {
-    status: mode === "wrong-exit" ? 0 : 2,
+    status:
+      mode === "wrong-exit" || (mode === "pages-accepts-invalid" && args[0] === "conversations")
+        ? 0
+        : 2,
     stdout: mode === "unexpected-stdout" ? "private executable output" : "",
     stderr: JSON.stringify({ error: mode === "wrong-error" ? "config" : "usage" }),
     error: mode === "spawn-failure" ? new Error("private spawn output") : undefined,

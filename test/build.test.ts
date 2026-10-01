@@ -49,6 +49,10 @@ function fixture(check: (directory: string) => void) {
         include: ["src"],
       }),
     )
+    writeFileSync(
+      join(directory, "src/context.d.ts"),
+      "export type IO = { stdout: (value: string) => void }\n",
+    )
     for (const suffix of ["js", "js.map", "d.ts"])
       writeFileSync(join(directory, `dist/deleted.${suffix}`), "stale")
     check(directory)
@@ -85,6 +89,12 @@ test("build removes deleted modules and their maps and declarations from the npm
     assert.equal(packed.status, 0, packed.stderr)
     const paths = JSON.parse(packed.stdout)[0].files.map((file: { path: string }) => file.path)
     assert.ok(paths.includes("dist/index.js"))
+    assert.ok(paths.includes("dist/context.d.ts"))
+    assert.equal(
+      readFileSync(join(directory, "dist/context.d.ts"), "utf8"),
+      readFileSync(join(directory, "src/context.d.ts"), "utf8"),
+    )
+    assert.equal(existsSync(join(directory, "dist/context.js")), false)
     assert.ok(paths.every((path: string) => !path.includes("deleted")))
   })
 })

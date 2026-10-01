@@ -146,7 +146,7 @@ test("REST removes source signal listeners after success and failure", async () 
   }
 })
 
-for (const mode of ["timeout", "manual"]) {
+for (const mode of ["timeout", "manual", "client-timeout"]) {
   test(`REST body ${mode} cancellation survives garbage collection`, async () => {
     const result = await promisify(execFile)(
       process.execPath,

@@ -14,11 +14,23 @@ childProcess.execFileSync = (command, args) => {
     })
   }
   assert.equal(command, "op")
-  assert.deepEqual(args, ["item", "get", "Crisp API Credentials", "--format", "json"])
+  assert.deepEqual(
+    args,
+    process.env.SMOKE_FIXTURE_CUSTOM_ITEM === "1"
+      ? ["item", "get", "Synthetic API Token", "--format", "json", "--vault", "Fixture Vault"]
+      : ["item", "get", "Crisp API Credentials", "--format", "json"],
+  )
   return JSON.stringify({
     fields: [
-      { label: "API Identifier", value: "fixture-id" },
-      { label: "API Key", value: "fixture-secret" },
+      {
+        label:
+          process.env.SMOKE_FIXTURE_CUSTOM_ITEM === "1" ? "token_identifier" : "API Identifier",
+        value: "fixture-id",
+      },
+      {
+        label: process.env.SMOKE_FIXTURE_CUSTOM_ITEM === "1" ? "token_key" : "API Key",
+        value: "fixture-secret",
+      },
       { label: "website_id", value: websiteId },
     ],
   })
