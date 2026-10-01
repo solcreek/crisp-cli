@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "strict": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": false,
+    "rootDir": "src",
+    "types": [
+      "node",
+      "react"
+    ],
+    "lib": [
+      "ES2022",
+      "ESNext.Disposable"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
+}

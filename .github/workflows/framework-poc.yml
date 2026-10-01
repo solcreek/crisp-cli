@@ -1,0 +1,36 @@
+name: CLI framework POC
+
+on:
+  pull_request:
+    paths:
+      - experiments/cli-frameworks/**
+      - .github/workflows/framework-poc.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 24]
+    defaults:
+      run:
+        working-directory: experiments/cli-frameworks
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: experiments/cli-frameworks/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test test/*.test.mjs
+        env:
+          POC_NODE20: ${{ matrix.node == 20 && '1' || '' }}
