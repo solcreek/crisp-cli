@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve an earlier command failure when stdout later reports EPIPE or another
+  output error, instead of turning the command's result into success.
+
 ## [0.3.1] - 2026-10-01
 
 ### Added

@@ -19,15 +19,14 @@ export async function runProcess(
     await out.flush()
   } catch (error) {
     const cause = error as NodeJS.ErrnoException
-    if (cause.code === "EPIPE") code = 0
-    else {
-      code = 1
+    if (cause.code !== "EPIPE") {
+      code ||= 1
       // Do not include arbitrary OS/stream error messages that could contain data.
       writeErr(err.write, argv.includes("--json"), new Error(cause.code === "OUTPUT_OVERFLOW"
         ? cause.message : "stdout write failed"), [])
     }
   }
-  try { await err.flush() } catch { code = 1 }
+  try { await err.flush() } catch { code ||= 1 }
   // Writable emits 'error' after invoking the failed write callback.
   await setImmediate()
   out.dispose()

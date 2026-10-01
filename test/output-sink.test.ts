@@ -2,8 +2,11 @@ import assert from "node:assert/strict"
 import { Writable } from "node:stream"
 import { setImmediate } from "node:timers/promises"
 import { test } from "node:test"
+import { EventEmitter } from "node:events"
+import type { Socket } from "socket.io-client"
 import { OutputSink } from "../src/output-sink.js"
 import { runProcess } from "../src/process-cli.js"
+import { credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from "./support.js"
 
 function capture() {
   let text = ""
@@ -82,8 +85,32 @@ for (const code of ["EPIPE", "ENOSPC"]) {
   })
 }
 
-test("process treats unavailable stderr as failure without recursive reporting", async () => {
+test("process preserves usage failure when stderr is unavailable", async () => {
   const out = capture()
   const err = new Writable({ write(_chunk, _encoding, callback) { callback(new Error("stderr failed")) } })
-  assert.equal(await runProcess(["unknown", "--json"], out.stream, err), 1)
+  assert.equal(await runProcess(["unknown", "--json"], out.stream, err), 2)
+})
+
+test("a delayed EPIPE preserves an earlier fatal RTM error", async () => {
+  const env = credentialEnv()
+  const err = capture()
+  let failWrite!: (error: Error) => void
+  const out = new Writable({ write(_chunk, _encoding, callback) { failWrite = callback } })
+  try {
+    await withCrispMock({ status: 200, json: okEnvelope({ socket: { app: "wss://fixture.invalid/rtm/" } }) }, async dispatcher => {
+      const socket = new EventEmitter() as EventEmitter & { connect(): unknown; disconnect(): unknown }
+      socket.connect = () => { queueMicrotask(() => socket.emit("connect")); return socket }
+      socket.disconnect = () => socket
+      socket.on("authentication", () => {
+        socket.emit("authenticated")
+        socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "fixture" })
+        socket.emit("unauthorized")
+        setImmediate().then(() => failWrite(Object.assign(new Error("pipe closed"), { code: "EPIPE" })))
+      })
+      assert.equal(await runProcess(["listen", "--json"], out, err.stream, {
+        env, dispatcher, socketFactory: () => socket as unknown as Socket,
+      }), 1)
+    })
+    assert.match(err.text(), /unauthorized/)
+  } finally { removeHome(env) }
 })
