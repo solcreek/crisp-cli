@@ -9,6 +9,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Query recorded browsing history with `conversations pages <session> [--page n]`,
+  including JSON output and read-only access, and document the companion RTM event.
 - Type-check the registry and installed-package verification scripts, enforce
   their coverage separately, and test installation and executable contract failures
   using offline fixtures.
@@ -28,6 +30,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Keep REST timeouts and cancellation effective during response body consumption
+  under garbage collection, including on the minimum supported Node.js version.
 - Validate conversation page arguments before resolving credentials, keeping
   invalid arguments as usage errors even with missing or malformed configuration.
 - Redact RTM string values and property names during JSON serialization, preserving

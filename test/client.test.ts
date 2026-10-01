@@ -1,5 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
+import { fileURLToPath } from "node:url"
+import { getEventListeners } from "node:events"
 import { MockAgent } from "undici"
 import { CrispClient } from "../src/client.js"
 import { CrispApiError } from "../src/errors.js"
@@ -123,6 +127,36 @@ test("empty success body returns null", async () => {
     assert.equal(value, null)
   })
 })
+
+test("204 without a response body returns null", async () => {
+  await withCrispMock({ status: 204, json: "" }, async (dispatcher) => {
+    assert.equal(await client(dispatcher).markRead(FIXTURE.session), null)
+  })
+})
+
+test("REST removes source signal listeners after success and failure", async () => {
+  for (const status of [200, 403]) {
+    const controller = new AbortController()
+    await withCrispMock({ status, json: okEnvelope([]) }, async (dispatcher) => {
+      const pending = client(dispatcher).getConnectEndpoints(controller.signal)
+      if (status === 200) await pending
+      else await assert.rejects(pending, CrispApiError)
+      assert.deepEqual(getEventListeners(controller.signal, "abort"), [])
+    })
+  }
+})
+
+for (const mode of ["timeout", "manual"]) {
+  test(`REST body ${mode} cancellation survives garbage collection`, async () => {
+    const result = await promisify(execFile)(
+      process.execPath,
+      ["--expose-gc", fileURLToPath(new URL("./fixtures/timeout-gc.mjs", import.meta.url)), mode],
+      { timeout: 10_000, env: {} },
+    )
+    assert.equal(result.stdout, "")
+    assert.equal(result.stderr, "")
+  })
+}
 
 test("missing intercept surfaces a network error and does not call the origin", async () => {
   const agent = new MockAgent()

@@ -15,6 +15,14 @@ mock-crisp.mjs intercepts endpoint discovery in E2E child processes using undici
 MockAgent. Unmatched REST requests cannot reach the network. The actual RTM traffic
 uses the real socket.io-client against a real local Socket.IO server.
 
+mock-pages.mjs intercepts a browsing-history GET in the built CLI child process.
+It checks the exact route and fixture authentication headers and blocks all
+unmatched network requests. Its page data and credentials are synthetic.
+
+timeout-gc.mjs holds a real loopback HTTP response open while forcing garbage
+collection. It verifies that REST deadlines and manual cancellation still stop
+body consumption. Its dispatcher routes every request to loopback, never Crisp.
+
 mock-smoke-child.mjs simulates the live smoke helper dependencies in an isolated
 child process, including stdout arriving after process exit. It uses fixture
 credentials and never contacts 1Password or Crisp.

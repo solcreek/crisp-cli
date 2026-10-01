@@ -45,6 +45,13 @@ export async function conversationsGet(io: IO, sessionRaw?: string): Promise<num
   return 0
 }
 
+export async function conversationsPages(io: IO, sessionRaw?: string): Promise<number> {
+  const session = requireArg(sessionRaw, usage.conversationsPages)
+  const page = pageNumber(io.flags.page)
+  writeOut(io.stdout, io.flags.json, await clientFrom(io).listConversationPages(session, page))
+  return 0
+}
+
 export async function conversationsSearch(io: IO, queryRaw?: string): Promise<number> {
   const query = requireArg(queryRaw, usage.conversationsSearch)
   const page = pageNumber(io.flags.page)

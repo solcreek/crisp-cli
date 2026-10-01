@@ -2,6 +2,7 @@ export const usage = {
   authSet:
     "crispctl auth set [--profile <name>] --identifier <id> --key <key> --tier <website|plugin> --website <website_id>",
   conversationsGet: "crispctl conversations get <session>",
+  conversationsPages: "crispctl conversations pages <session> [--page <n>]",
   conversationsSearch:
     "crispctl conversations search <query> [--page <n>] [--search-type text|segment]",
   messagesList: "crispctl messages list <session>",
@@ -44,6 +45,13 @@ The key value is not included.
   "conversations list": `GET /v1/website/{website_id}/conversations/{page}
 `,
   "conversations get": `GET /v1/website/{website_id}/conversation/{session}
+`,
+  "conversations pages": `GET /v1/website/{website_id}/conversation/{session}/pages/{page}
+Returns one page of browsing history recorded by Crisp for this session.
+--page defaults to 1 and must be a positive safe integer. An empty page returns [].
+Optional fields: page_title, page_url, page_referrer, and timestamp.
+Requires website:conversation:pages read access.
+For new visits, use listen --events session:sync:pages --session <session> --json.
 `,
   "conversations search": `GET /v1/website/{website_id}/conversations/{page}?search_query&search_type
 search_type is text (default) or segment.
