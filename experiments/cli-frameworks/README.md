@@ -7,6 +7,16 @@ companion for inferred options. Ink is a useful optional human-facing `watch`
 interface. Crust deserves another evaluation if Node 24 and its tooling peer
 requirements become acceptable, especially if generated skills/MCP are needed.
 
+Runtime policy is a separate decision: as of 2026-10-01, [Node 20 is EOL and
+Node 24 is LTS](https://nodejs.org/en/about/previous-releases). The Node 20 rows
+measure compatibility with our existing promise; they are not a recommendation
+to keep that baseline indefinitely. For a new Node 24 baseline, Commander 15 and
+Ink 7 are the corresponding choices. Raising the baseline removes Crust's Node
+blocker, but its command/lifecycle integration costs and TypeScript peer range
+still need deliberate treatment. Commander remains the smaller migration for
+our existing RTM/output runtime; Crust becomes more compelling if one command
+model must drive CLI, skills and MCP.
+
 This experiment runs actual framework packages with deterministic local fixtures.
 It implements `conversations list`, `reply` and `listen` through the same operation
 layer. `reply` only echoes fixture data. There is no Crisp network access,
@@ -99,7 +109,7 @@ compatibility shim. Full argument/error transcripts are in
 
 Measurements on Apple M3 / macOS arm64 / Node 24.21.0:
 
-| Adapter | JSON list process median | Loaded runtime dependency closure | Installed package files |
+| Adapter | JSON list process median | Runtime dependency closure | Installed package files |
 | --- | ---: | ---: | ---: |
 | Commander 15 | 53 ms | 1 package | 0.20 MiB |
 | Crust core + extensions | 72 ms | 6 packages | 2.85 MiB |
