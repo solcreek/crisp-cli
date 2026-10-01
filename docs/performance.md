@@ -178,3 +178,121 @@ claiming a speedup; do not infer exact import costs by subtracting medians.
 Tail latency varied noticeably between runs on this development machine. Treat
 these numbers as an initial reference, not a cross-machine SLA or evidence that
 one Node version is always faster. No live Crisp performance was measured.
+
+## Optimization study against v0.5.0
+
+Baseline runtime: `d7365ae` (`v0.5.0`). Candidate runtime: `c3b3460`. The driver
+used identical synthetic fixtures for both built checkouts on the same Apple M3
+macOS arm64 machine. Each full run used three warmups and 30 measured samples
+per scenario, sequentially, without concurrent test suites. Node versions were
+24.21.0 and 22.12.0. Values below are milliseconds for complete process lifetime.
+
+| Scenario           | Node 24 before p50 | After p50 | Node 22 before p50 | After p50 |
+| ------------------ | -----------------: | --------: | -----------------: | --------: |
+| `node-baseline`    |              30.24 |     31.81 |              51.39 |     49.02 |
+| `version`          |              83.85 |     42.09 |             130.83 |     60.48 |
+| `help`             |              84.76 |     45.29 |             129.53 |     61.48 |
+| `nested-help`      |              85.40 |     44.18 |             136.56 |     62.48 |
+| `usage-error`      |              84.74 |     44.22 |             131.54 |     61.49 |
+| `invalid-page`     |              85.22 |     46.23 |             136.51 |     62.81 |
+| `read-only-write`  |              85.53 |     47.13 |             133.04 |     64.50 |
+| `auth-file`        |              86.20 |     46.16 |             137.83 |     64.32 |
+| `event-catalog`    |              84.78 |     45.96 |             134.77 |     64.93 |
+| `rest-small`       |              91.64 |     78.84 |             139.65 |     97.79 |
+| `rest-error`       |              91.22 |     78.98 |             141.37 |     97.77 |
+| `rest-large`       |              99.95 |     91.41 |             150.07 |    112.40 |
+| `rest-slow-reader` |             183.23 |    175.47 |             236.68 |    196.15 |
+| `rtm-first-event`  |             102.88 |    114.94 |             159.44 |    152.98 |
+| `rtm-burst`        |             122.54 |    126.24 |             202.50 |    172.12 |
+| `rtm-cancel`       |             102.34 |    110.54 |             158.50 |    150.24 |
+
+### Follow-up checks for variability
+
+The sequential Node 24 run showed worse RTM wall times, unlike the exploratory
+run. To check order/background-load effects, an additional **A → B → B → A** run
+measured an empty Node control, RTM first event, 1,000-event burst and cancellation.
+Each block used two warmups and 15 samples, yielding 30 samples per variant.
+All four blocks are retained in the raw study reports. Combined results:
+
+| Node 24 scenario  | Before p50 | After p50 | Before p95 | After p95 |
+| ----------------- | ---------: | --------: | ---------: | --------: |
+| `node-baseline`   |      31.91 |     29.87 |      38.78 |     33.42 |
+| `rtm-first-event` |     107.56 |    101.96 |     142.75 |    132.83 |
+| `rtm-burst`       |     132.15 |    118.87 |     255.56 |    144.34 |
+| `rtm-cancel`      |     106.70 |    104.72 |     145.84 |    154.45 |
+
+Signal-to-close alone was 3.61 → 3.37 ms p50 and
+7.10 → 5.87 ms p95. First-event differences are small enough that
+background load remains a plausible contributor; a consistent RTM startup
+speedup is not established. The burst improvement is supported by the component
+results below, but is not a WAN throughput measurement.
+
+Node 22 slow-reader p95 also varied substantially, so it received its own A → B →
+B → A check. Both variants scheduled exactly 85 ms of pauses. Wall p50 was
+215.82 → 206.62 ms; p95 was 256.49 → 275.66 ms. This does not establish a
+tail-latency improvement; keep recording tails instead of setting a hard gate
+from this workstation sample.
+
+### Component batches
+
+Twenty samples and three warmups per batch, on the same machine. Each number
+includes the assertions described above. Unchanged components are controls,
+not claimed optimizations. Times are milliseconds for the entire batch.
+
+| Batch                      | Node 24 before p50 | After p50 | Node 22 before p50 | After p50 |
+| -------------------------- | -----------------: | --------: | -----------------: | --------: |
+| `command-tree-100`         |             16.286 |     4.681 |             14.459 |     3.788 |
+| `tree-and-parse-100`       |             16.080 |     4.951 |             15.151 |     4.044 |
+| `config-file-100`          |              1.791 |     2.018 |              1.964 |     1.891 |
+| `credential-snapshot-1000` |              0.037 |     0.043 |              0.036 |     0.033 |
+| `body-read-1mib`           |              0.891 |     0.899 |              0.682 |     0.605 |
+| `decode-1mib`              |              0.516 |     0.564 |              0.493 |     0.481 |
+| `json-output-1mib`         |              1.329 |     1.555 |              1.328 |     1.313 |
+| `redact-1000-events`       |              7.783 |     3.361 |              8.170 |     3.615 |
+| `output-queue-50000`       |            232.297 |    14.192 |            918.017 |    14.420 |
+
+### Changes supported by the measurements
+
+- **Startup:** defer operation modules and load Undici/Socket.IO at their actual
+  use boundaries. Cold-process tests reject any unexpected transport imports for
+  help, config, catalog, invalid arguments and read-only writes. Cancellation
+  during HTTP-module loading is checked before dispatch.
+- **Command construction:** allocate only each command’s declared local options;
+  keep a fresh Commander tree per invocation.
+- **Redaction:** compile the escaped, longest-first secret pattern once per JSON
+  serialization. Patterns and object copies remain local to that serialization.
+- **Output queue:** clear consumed slots immediately and compact the remaining
+  array periodically, avoiding a shift of the whole backlog for every write.
+  Byte limits, single in-flight writes, error handling and cancellation remain
+  exercised by behavior tests.
+
+Help peak RSS on Node 24 fell from 73.34 to 52.16 MiB (p50).
+Configuration, credential snapshots, body reading and JSON decoding already
+account for small measured batches; their small differences are not attributed
+to these changes. The bounded/cancellable response reader retains its existing
+implementation.
+
+Remaining limits: these measurements do not characterize live Crisp/DNS/WAN
+latency, sustained RTM heap growth, reconnect recovery distributions or terminal
+rendering. Existing transport, retry, backpressure and cancellation tests cover
+behavior; the numbers here support the specific local optimizations above, not
+a claim that every path or tail percentile is optimal.
+
+### Reused output pipeline
+
+`npm run bench:soak` builds the CLI and runs the output-only probe with
+`--expose-gc`. To compare an existing build, run
+`node --expose-gc scripts/benchmark-output-soak.mjs /path/to/built-checkout`.
+It warms up 5,000 records, then processes 100,000 records in batches of 1,000
+through one reused sink, checking ordering and secret redaction. Memory snapshots
+follow forced GC after warmup and every 20,000 measured records.
+
+| Runtime  | Before duration | After duration | Before heap range | After heap range |
+| -------- | --------------: | -------------: | ----------------: | ---------------: |
+| v24.21.0 |       477.73 ms |      255.61 ms |     4.21–4.27 MiB |    4.21–4.28 MiB |
+| v22.12.0 |       527.20 ms |      292.60 ms |     4.04–4.10 MiB |    4.03–4.12 MiB |
+
+These are single observed durations including validation and GC, not p50/p95.
+The retained heap stayed within roughly 0.1 MiB during this probe. That supports
+repeated output-queue reuse in this workload; it is not proof against all memory
+leaks and does not exercise a long-lived Socket.IO connection.
