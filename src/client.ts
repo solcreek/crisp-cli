@@ -1,4 +1,6 @@
 import { fetch as undiciFetch, type Dispatcher } from "undici"
+import { Readable } from "node:stream"
+import { text as readText } from "node:stream/consumers"
 import { CrispApiError, UsageError } from "./errors.js"
 import type { Tier } from "./config.js"
 import { version } from "./version.js"
@@ -174,10 +176,12 @@ export class CrispClient {
 
     let response: Awaited<ReturnType<typeof undiciFetch>> | undefined
     let text: string
+    const signals = [this.signal, opts?.signal, AbortSignal.timeout(20_000)].filter(
+      (signal): signal is AbortSignal => signal !== undefined,
+    )
+    const retainTimeout = () => {}
+    for (const source of signals) source.addEventListener("abort", retainTimeout)
     try {
-      const signals = [this.signal, opts?.signal, AbortSignal.timeout(20_000)].filter(
-        (signal): signal is AbortSignal => signal !== undefined,
-      )
       const signal = AbortSignal.any(signals)
       signal.throwIfAborted()
       response = await undiciFetch(url, {
@@ -188,7 +192,9 @@ export class CrispClient {
         dispatcher: this.dispatcher,
         signal,
       })
-      text = await response.text()
+      // Keep cancellation attached to the body reader even if fetch's internal
+      // Request/AbortController is collected after headers have arrived.
+      text = response.body ? await readText(Readable.fromWeb(response.body, { signal })) : ""
     } catch (err) {
       if (response && response.status >= 400) {
         throw new CrispApiError(
@@ -200,6 +206,11 @@ export class CrispClient {
       }
       const message = err instanceof Error ? err.message : "request failed"
       throw new CrispApiError(0, "network_error", message)
+    } finally {
+      // Observing source signals keeps timeouts alive through body consumption on
+      // Node 22.12, where AbortSignal.any() alone may lose them to garbage collection.
+      // https://github.com/nodejs/node/issues/57736
+      for (const source of signals) source.removeEventListener("abort", retainTimeout)
     }
 
     const retryAfter = response.headers.get("retry-after") ?? undefined
