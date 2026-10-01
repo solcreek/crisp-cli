@@ -174,3 +174,13 @@ test("cancellation and caller deadline interrupt an in-progress response body", 
     } finally { clearTimeout(keepAlive) }
   }
 })
+
+test("body resets preserve error status and Retry-After already received in headers", async () => {
+  for (const [status, reason] of [[401, "unauthorized"], [403, "unauthorized"], [429, "rate_limited"], [503, "http_error"]] as const) {
+    const dispatcher = new BodyDispatcher(handler => {
+      handler.onData!(Buffer.from('{"data":'))
+      setImmediate(() => handler.onError!(new Error("body reset")))
+    }, status)
+    await assert.rejects(client(dispatcher).getConnectEndpoints(), { name: "CrispApiError", status, reason, retryAfter: "2" })
+  }
+})

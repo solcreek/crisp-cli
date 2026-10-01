@@ -147,7 +147,7 @@ export class CrispClient {
       body = JSON.stringify(opts.body)
     }
 
-    let response: Awaited<ReturnType<typeof undiciFetch>>
+    let response: Awaited<ReturnType<typeof undiciFetch>> | undefined
     let text: string
     try {
       response = await undiciFetch(url, {
@@ -160,6 +160,10 @@ export class CrispClient {
       })
       text = await response.text()
     } catch (err) {
+      if (response && response.status >= 400) {
+        throw new CrispApiError(response.status, statusReason(response.status), `HTTP ${response.status}`,
+          response.headers.get("retry-after") ?? undefined)
+      }
       const message = err instanceof Error ? err.message : "request failed"
       throw new CrispApiError(0, "network_error", message)
     }

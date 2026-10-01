@@ -24,7 +24,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Honor discovery `Retry-After` headers, add jitter to reconnect delays, and keep
   long retry waits cancellable without overflowing Node timers.
 - Normalize network failures while reading HTTP response bodies so RTM endpoint
-  discovery reconnects after a partial-response disconnect.
+  discovery reconnects after a partial-response disconnect, preserving known HTTP
+  error statuses and retry hints when headers have already arrived.
 - Handle closed stdout pipes without an uncaught EPIPE, drain queued output before
   exit, and stop RTM with an explicit error when a slow consumer exceeds the 8 MiB
   output buffer limit.
