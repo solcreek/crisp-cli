@@ -175,6 +175,11 @@ Ctrl-C / SIGTERM closes the connection and exits cleanly. `--count N` exits succ
 
 Output is written in order and drained before normal exit. Closing the stdout pipe
 (for example, a downstream reader stopping early) cancels listening cleanly.
+REST response bodies are limited to 8 MiB after decompression, including chunked
+responses. Oversized successful responses fail with `response_too_large`; HTTP
+errors retain their status classification and `Retry-After`. Malformed envelope
+fields fail validation, while unknown fields and arbitrary `data` remain accepted.
+
 Pending output is limited to 8 MiB per stream; exceeding this limit stops the
 listener with exit 1 and an explicit error. Overflow can truncate pending output;
 it does not silently drop events and continue.

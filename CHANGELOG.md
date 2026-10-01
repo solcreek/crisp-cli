@@ -30,6 +30,10 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Validate REST envelope field types and preserve HTTP error classification and
+  retry metadata for malformed responses; bound decoded response bodies to 8 MiB
+  and cancel oversized streams before JSON parsing.
+
 - Keep REST timeouts and cancellation effective during response body consumption
   under garbage collection, including on the minimum supported Node.js version.
 - Validate conversation page arguments before resolving credentials, keeping
