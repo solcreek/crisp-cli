@@ -244,3 +244,62 @@ test("a delayed EPIPE preserves an earlier fatal RTM error", async () => {
     removeHome(env)
   }
 })
+
+test("RTM deadline during stdout drain reports timeout once after count completes", async () => {
+  const env = credentialEnv()
+  const err = capture()
+  const out = new Writable({ write() {} })
+  let disconnected = false
+  const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
+  try {
+    await withCrispMock(
+      { status: 200, json: okEnvelope({ socket: { app: "wss://fixture.invalid/rtm/" } }) },
+      async (dispatcher) => {
+        const socket = new EventEmitter() as EventEmitter & {
+          connect(): unknown
+          disconnect(): unknown
+        }
+        socket.connect = () => {
+          queueMicrotask(() => socket.emit("connect"))
+          return socket
+        }
+        socket.disconnect = () => {
+          disconnected = true
+          return socket
+        }
+        socket.on("authentication", () => {
+          socket.emit("authenticated")
+          socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "fixture" })
+        })
+        assert.equal(
+          await runProcess(
+            ["listen", "--json", "--count", "1", "--timeout", "1"],
+            out,
+            err.stream,
+            {
+              env,
+              dispatcher,
+              socketFactory: () => socket as unknown as Socket,
+              drainTimeoutMs: 5000,
+            },
+          ),
+          1,
+        )
+      },
+    )
+    const diagnostics = err
+      .text()
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((value) => value.error)
+    assert.equal(diagnostics.length, 1)
+    assert.equal(diagnostics[0].error, "timeout")
+    assert.equal(disconnected, true)
+    assert.equal(out.destroyed, true)
+    assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before)
+    assert.equal(out.listenerCount("error"), 0)
+  } finally {
+    removeHome(env)
+  }
+})

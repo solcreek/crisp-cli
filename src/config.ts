@@ -91,14 +91,11 @@ export function saveConfig(env: NodeJS.ProcessEnv, config: ConfigFile): void {
     chmodSync(tmp, 0o600)
     renameSync(tmp, path)
     chmodSync(path, 0o600)
-  } catch (err) {
+  } catch {
     try {
       if (existsSync(tmp)) unlinkSync(tmp)
     } catch {
       // The original write error is the one to report.
-    }
-    if (err instanceof ConfigError) {
-      throw err
     }
     throw new ConfigError("could not write config file")
   }

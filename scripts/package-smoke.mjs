@@ -23,6 +23,7 @@ try {
   assert.equal(packed.version, pkg.version)
   for (const required of [
     "dist/index.js",
+    "dist/context.d.ts",
     "dist/rtm-events.js",
     "docs/rtm-coverage.md",
     "CHANGELOG.md",

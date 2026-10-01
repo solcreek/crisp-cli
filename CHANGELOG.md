@@ -19,6 +19,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Keep the type-only command context as a shipped declaration, avoiding phantom
+  runtime coverage, and test config I/O failures and deadlines during output drain.
+
 - Coordinate garbage-collection cancellation regressions with response-body
   progress, and verify that cancellation closes the underlying HTTP transport.
 
