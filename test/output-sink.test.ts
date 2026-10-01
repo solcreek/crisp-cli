@@ -74,16 +74,68 @@ test("process output drains and disposes its listeners", async () => {
   assert.equal(err.stream.listenerCount("error"), 0)
 })
 
-for (const code of ["EPIPE", "ENOSPC"]) {
+for (const code of ["EPIPE", "ENOSPC", "OUTPUT_SPOOFED"]) {
   test(`process handles stdout ${code} without disclosing stream error content`, async () => {
     const out = new Writable({ write(_chunk, _encoding, callback) { callback(Object.assign(new Error("secret payload"), { code })) } })
     const err = capture()
     assert.equal(await runProcess(["--version", "--json"], out, err.stream), code === "EPIPE" ? 0 : 1)
     assert.doesNotMatch(err.text(), /secret payload/)
-    if (code === "ENOSPC") assert.equal(JSON.parse(err.text()).message, "stdout write failed")
+    if (code !== "EPIPE") assert.equal(JSON.parse(err.text()).message, "stdout write failed")
     else assert.equal(err.text(), "")
   })
 }
+
+for (const mode of ["timeout", "abort", "already aborted", "close"] as const) {
+  test(`pending sink flush settles on ${mode}`, async () => {
+    const stream = new Writable({ write() {} })
+    let stopped = 0
+    const sink = new OutputSink(stream, () => stopped++, "stdout")
+    const controller = new AbortController()
+    sink.write("pending")
+    if (mode === "already aborted") controller.abort()
+    const flushed = sink.flush(controller.signal, 20)
+    if (mode === "abort") controller.abort()
+    if (mode === "close") stream.destroy()
+    await assert.rejects(flushed, { code: mode === "timeout" ? "OUTPUT_TIMEOUT"
+      : mode === "close" ? "OUTPUT_CLOSED" : "OUTPUT_CANCELLED" })
+    assert.equal(stopped, 1)
+    assert.equal(stream.destroyed, true)
+    await setImmediate()
+    sink.dispose()
+    assert.equal(stream.listenerCount("close"), 0)
+    assert.equal(stream.listenerCount("error"), 0)
+  })
+}
+
+test("process bounds stdout drain and reports the failure without leaking listeners", async () => {
+  const out = new Writable({ write() {} })
+  const err = capture()
+  const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
+  assert.equal(await runProcess(["--version", "--json"], out, err.stream, { drainTimeoutMs: 20 }), 1)
+  assert.match(JSON.parse(err.text()).message, /stdout output drain timed out/)
+  assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before)
+})
+
+test("process bounds stderr drain and preserves usage exit status", async () => {
+  const out = capture()
+  const err = new Writable({ write() {} })
+  assert.equal(await runProcess(["unknown", "--json"], out.stream, err, { drainTimeoutMs: 20 }), 2)
+  assert.equal(err.destroyed, true)
+})
+
+test("process cancellation during output drain reports truncated output", async () => {
+  const controller = new AbortController()
+  const out = new Writable({ write() { queueMicrotask(() => controller.abort()) } })
+  const err = capture()
+  assert.equal(await runProcess(["--version", "--json"], out, err.stream, { signal: controller.signal }), 1)
+  assert.match(JSON.parse(err.text()).message, /output drain cancelled/)
+})
+
+test("process accepts an already aborted signal when stdout is empty", async () => {
+  const out = capture(), err = capture()
+  assert.equal(await runProcess(["unknown", "--json"], out.stream, err.stream, { signal: AbortSignal.abort() }), 2)
+  assert.equal(JSON.parse(err.text()).error, "usage")
+})
 
 test("process preserves usage failure when stderr is unavailable", async () => {
   const out = capture()

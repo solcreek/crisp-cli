@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Keep the listen deadline and cancellation active while stdout drains; bound
+  each stream's final drain to 5 seconds so a stalled consumer cannot prevent
+  exit, and report incomplete output as a failure.
 - Preserve an earlier command failure when stdout later reports EPIPE or another
   output error, instead of turning the command's result into success.
 

@@ -12,15 +12,17 @@ import {
   type ConfigFile,
   type Tier,
 } from "./config.js"
-import { CrispApiError, exitCodeFor, UsageError } from "./errors.js"
+import { exitCodeFor, UsageError } from "./errors.js"
 import { renderHelp, ROOT_HELP, usage } from "./help.js"
 import { writeErr, writeOut } from "./output.js"
 import { listen, parseEvents, positiveInteger, type SocketFactory } from "./rtm.js"
 import { RTM_EVENTS, RTM_REFERENCE_CHECKED, RTM_REFERENCE_URL } from "./rtm-events.js"
 import { redactSecrets } from "./redact.js"
 import { version } from "./version.js"
+import { RunLifecycle } from "./lifecycle.js"
 
 export type RunOptions = {
+  lifecycle?: RunLifecycle
   stdout?: (chunk: string) => void
   stderr?: (chunk: string) => void
   env?: NodeJS.ProcessEnv
@@ -30,6 +32,7 @@ export type RunOptions = {
 }
 
 type IO = {
+  lifecycle?: RunLifecycle
   stdout: (chunk: string) => void
   stderr: (chunk: string) => void
   env: NodeJS.ProcessEnv
@@ -48,7 +51,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
   try {
     const parsed = parseArgv(argv)
     flags = parsed.flags
-    const io: IO = { stdout, stderr, env, dispatcher: options.dispatcher, signal: options.signal, socketFactory: options.socketFactory, flags }
+    const io: IO = { stdout, stderr, env, dispatcher: options.dispatcher, signal: options.signal, socketFactory: options.socketFactory, flags, lifecycle: options.lifecycle }
     return await execute(parsed, io)
   } catch (err) {
     writeErr(stderr, flags?.json ?? wantsJson, err, collectSecrets(env, flags))
@@ -315,30 +318,19 @@ async function listenCommand(extra: string | undefined, seen: Set<string>, io: I
   const session = io.flags.session === undefined ? undefined : requireArg(io.flags.session, usage.listen)
   const creds = resolveCredentials(io.env, { profile: io.flags.profile, website: websiteOverride(io.flags) })
   assertComplete(creds)
-  const controller = new AbortController()
-  let timedOut = false
-  const stop = () => controller.abort()
-  process.once("SIGINT", stop)
-  process.once("SIGTERM", stop)
-  io.signal?.addEventListener("abort", stop, { once: true })
-  if (io.signal?.aborted) stop()
-  const timer = timeout === undefined ? undefined : setTimeout(() => {
-    timedOut = true
-    stop()
-  }, timeout * 1000)
+  const lifecycle = io.lifecycle ?? new RunLifecycle(io.signal)
+  lifecycle.handleSignals()
+  lifecycle.setDeadline(timeout)
   try {
     await listen(new CrispClient(creds, io.dispatcher, true), creds, {
-      events, session, count, signal: controller.signal, socketFactory: io.socketFactory,
+      events, session, count, signal: lifecycle.signal, socketFactory: io.socketFactory,
       onEvent: event => writeOut(chunk => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
       onStatus: status => writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
     })
-    if (timedOut) throw new CrispApiError(0, "timeout", "RTM listen deadline reached")
+    if (lifecycle.timedOut) throw lifecycle.timeoutError()
     return 0
   } finally {
-    clearTimeout(timer)
-    process.removeListener("SIGINT", stop)
-    process.removeListener("SIGTERM", stop)
-    io.signal?.removeEventListener("abort", stop)
+    if (!io.lifecycle) lifecycle.dispose()
   }
 }
 
