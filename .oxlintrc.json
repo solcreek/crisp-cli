@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "node"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "eslint/no-shadow": "error",
+    "eslint/eqeqeq": "error"
+  },
+  "env": { "node": true },
+  "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**"]
+}

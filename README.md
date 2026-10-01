@@ -178,10 +178,25 @@ The script reads `Crisp API Credentials` (`API Identifier`, `API Key`, `website_
 Unit and HTTP contract tests use undici [`MockAgent`](https://undici.nodejs.org/#/docs/api/MockAgent) against `https://api.crisp.chat`. Each MVP verb has a happy path plus HTTP 400 and 429. The mock is the client's dispatcher, so the test sees the real path, query, and body. Nothing in `npm test` contacts Crisp.
 
 ```bash
+npm run fmt
+npm run lint
 npm test
 npm run typecheck
 npm run verify
 ```
+
+Formatting uses [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), and
+[Oxlint](https://oxc.rs/docs/guide/usage/linter.html) checks correctness, variable
+shadowing and strict equality across source, tests and scripts. Both tools run
+from pinned dev dependencies; no Rust installation is needed. `npm run fmt:check`
+checks formatting without changing files, and `npm run lint:fix` applies safe lint
+fixes. Warnings fail the lint gate. Generated build/coverage files and npm's
+lockfile are excluded from formatting, as is the captured RTM reference snapshot.
+TypeScript remains responsible for type checking and building the CLI.
+
+The mechanical formatting commit is recorded in `.git-blame-ignore-revs`. Use
+`git blame --ignore-revs-file .git-blame-ignore-revs <file>` to see the preceding
+history when reviewing code ownership.
 
 `npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 22 and 24. No Crisp credentials or external services are needed.
 
@@ -192,7 +207,7 @@ read-only mode before writes. REST, RTM, output and lifecycle code remain separa
 from the command framework. CLI compatibility tests cover option placement,
 literal values, help, concurrent invocations and credential redaction on errors.
 
-`npm run verify` runs typecheck, offline tests, the RTM coverage gate and
+`npm run verify` runs formatting and lint checks, typecheck, offline tests, the RTM coverage gate and
 `test:package`. The package smoke installs an actual tarball into a temporary
 directory and checks its executable, version, help, event catalog and error exit.
 It may download dependencies from npm; it never accesses Crisp or 1Password.
@@ -250,7 +265,7 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including formatting, lint, typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 
 Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
 `.github/workflows/verify.yml` as releases. No live Crisp calls are included.
