@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Verify installed `conversations pages` help, required arguments and page
+  validation without credentials in local and published-package smoke checks.
+
 - Query recorded browsing history with `conversations pages <session> [--page n]`,
   including JSON output and read-only access, and document the companion RTM event.
 - Type-check the registry and installed-package verification scripts, enforce
