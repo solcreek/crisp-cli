@@ -20,6 +20,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Redact RTM string values and property names during JSON serialization, preserving
+  escaped credentials, numeric fields and valid NDJSON output.
 - Reject release verification inputs with leading zeroes in numeric prerelease
   identifiers before contacting npm, avoiding unnecessary registry polling.
 - Clean build output before compiling and suppress output on type errors, so npm

@@ -17,7 +17,6 @@ import { usage } from "./help.js"
 import { writeOut } from "./output.js"
 import { listen, parseEvents } from "./rtm.js"
 import { RTM_EVENTS, RTM_REFERENCE_CHECKED, RTM_REFERENCE_URL } from "./rtm-events.js"
-import { redactSecrets } from "./redact.js"
 import { RunLifecycle } from "./lifecycle.js"
 
 import type { IO } from "./context.js"
@@ -212,8 +211,7 @@ export async function listenCommand(io: IO): Promise<number> {
       count,
       signal: lifecycle.signal,
       socketFactory: io.socketFactory,
-      onEvent: (event) =>
-        writeOut((chunk) => io.stdout(redactSecrets(chunk, [creds.key])), io.flags.json, event),
+      onEvent: (event) => writeOut(io.stdout, io.flags.json, event, [creds.key]),
       onStatus: (status) =>
         writeOut(io.stderr, io.flags.json, io.flags.json ? status : `RTM ${status.status}`),
     })
