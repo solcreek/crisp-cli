@@ -42,6 +42,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Subscribe to `message:received` for operator notes in the sandbox live write
+  check, with a full offline regression over local TLS and Socket.IO.
+
 - Accept `token_identifier` and `token_key` field names in 1Password API-token
   items used by the opt-in RTM smoke check.
 

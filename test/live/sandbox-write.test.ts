@@ -65,7 +65,7 @@ test(
       timeout = setTimeout(() => controller.abort(), 60_000)
       listening = listen(readOnly, creds, {
         signal: controller.signal,
-        events: ["message:send"],
+        events: ["message:received"],
         session,
         count: 1,
         onStatus: (status) => {

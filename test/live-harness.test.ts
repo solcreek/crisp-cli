@@ -42,3 +42,36 @@ for (const mode of ["mismatch", "auth-failure"]) {
     }
   })
 }
+
+test("live write harness receives operator notes and completes its full contract offline", () => {
+  const env = credentialEnv({
+    CRISPCTL_LIVE: "1",
+    CRISPCTL_LIVE_WRITE: "1",
+    CRISPCTL_LIVE_WEBSITE_NAME: "Fixture sandbox",
+    CRISPCTL_IDENTIFIER: "fixture-identifier",
+    CRISPCTL_KEY: "fixture-key",
+    CRISPCTL_TIER: "website",
+    CRISPCTL_WEBSITE_ID: "fixture-website",
+    NODE_EXTRA_CA_CERTS: fileURLToPath(new URL("./fixtures/localhost-cert.pem", import.meta.url)),
+  })
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--import",
+        fileURLToPath(new URL("./fixtures/live-write-success.mjs", import.meta.url)),
+        fileURLToPath(new URL("./live/sandbox-write.test.ts", import.meta.url)),
+      ],
+      { env, encoding: "utf8", timeout: 12_000 },
+    )
+    assert.ifError(child.error)
+    assert.equal(child.signal, null)
+    assert.equal(child.status, 0, child.stdout + child.stderr)
+    assert.match(child.stdout, /live-success-contract-passed/)
+    assert.doesNotMatch(child.stdout + child.stderr, /fixture-key/)
+  } finally {
+    removeHome(env)
+  }
+})
