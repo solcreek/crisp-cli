@@ -4,7 +4,6 @@ import type { IO } from "./context.js"
 import { UsageError } from "./errors.js"
 import { COMMAND_NOTES, ROOT_NOTES, type CommandPath } from "./help.js"
 import { OPTIONS, type OptionName } from "./command-options.js"
-import * as operations from "./operations.js"
 
 export type CommandDefinition = {
   description: string
@@ -12,86 +11,93 @@ export type CommandDefinition = {
   options?: readonly OptionName[]
   run: (io: IO, argument?: string) => number | Promise<number>
 }
+
+function operation(name: keyof typeof import("./operations.js")): CommandDefinition["run"] {
+  return async (io, argument) => {
+    const operations = await import("./operations.js")
+    return operations[name](io, argument)
+  }
+}
 const DEFINITIONS: Readonly<Record<CommandPath, CommandDefinition>> = {
   "auth set": {
     description: "Save a credential profile",
     options: ["identifier", "key", "tier"],
-    run: operations.authSet,
+    run: operation("authSet"),
   },
   "auth show": {
     description: "Show the profile with the key redacted",
-    run: operations.authShow,
+    run: operation("authShow"),
   },
   "conversations list": {
     description: "List conversations",
     options: ["page"],
-    run: operations.conversationsList,
+    run: operation("conversationsList"),
   },
   "conversations get": {
     description: "Get one conversation",
     argument: "<session>",
-    run: operations.conversationsGet,
+    run: operation("conversationsGet"),
   },
   "conversations search": {
     description: "Search conversations",
     argument: "<query>",
     options: ["page", "search-type"],
-    run: operations.conversationsSearch,
+    run: operation("conversationsSearch"),
   },
   "conversations pages": {
     description: "List browsed pages in a session",
     argument: "<session>",
     options: ["page"],
-    run: operations.conversationsPages,
+    run: operation("conversationsPages"),
   },
   "messages list": {
     description: "List messages in a session",
     argument: "<session>",
-    run: operations.messagesList,
+    run: operation("messagesList"),
   },
   reply: {
     description: "Send an operator message or private note",
     argument: "<session>",
     options: ["text", "note"],
-    run: operations.replyCommand,
+    run: operation("replyCommand"),
   },
   resolve: {
     description: "Set conversation state to resolved",
     argument: "<session>",
-    run: operations.resolveCommand,
+    run: operation("resolveCommand"),
   },
   reopen: {
     description: "Set conversation state to unresolved",
     argument: "<session>",
-    run: operations.reopenCommand,
+    run: operation("reopenCommand"),
   },
   assign: {
     description: "Assign or unassign an operator",
     argument: "<session>",
     options: ["user", "unassign"],
-    run: operations.assignCommand,
+    run: operation("assignCommand"),
   },
   segments: {
     description: "Replace conversation segments",
     argument: "<session>",
     options: ["set"],
-    run: operations.segmentsCommand,
+    run: operation("segmentsCommand"),
   },
   read: {
     description: "Mark the conversation read",
     argument: "<session>",
-    run: operations.readCommand,
+    run: operation("readCommand"),
   },
   "people get": {
     description: "Get a people profile by ID or email",
     argument: "<id|email>",
-    run: operations.peopleGet,
+    run: operation("peopleGet"),
   },
-  "operators list": { description: "List website operators", run: operations.operatorsList },
+  "operators list": { description: "List website operators", run: operation("operatorsList") },
   listen: {
     description: "Stream RTM events with automatic reconnection",
     options: ["events", "session", "count", "timeout", "list-events"],
-    run: operations.listenCommand,
+    run: operation("listenCommand"),
   },
 }
 
@@ -108,6 +114,7 @@ export function createCommandTree() {
       .configureOutput({ writeOut: () => {}, writeErr: () => {} })
   const root = create("crispctl").description("Agent-friendly Crisp REST and RTM CLI")
   const optionDefinitions = OPTIONS.map(([flags, description]) => new Option(flags, description))
+  const optionsByName = new Map(optionDefinitions.map((option) => [option.name(), option]))
   for (const option of optionDefinitions)
     root.addOption(option.hideHelp(!GLOBAL_FLAGS.has(option.name())))
   const leaves: Command[] = []
@@ -133,9 +140,9 @@ export function createCommandTree() {
     }
     const command = create(path.at(-1)!).description(definition.description)
     if (definition.argument) command.argument(definition.argument)
-    for (const [flags, description] of OPTIONS) {
-      const option = new Option(flags, description)
-      if (definition.options?.some((name) => name === option.name())) command.addOption(option)
+    for (const name of definition.options ?? []) {
+      const option = optionsByName.get(name)!
+      command.addOption(new Option(option.flags, option.description))
     }
     command.addHelpText("after", `\n${COMMAND_NOTES[commandPath]}`)
     command.action(async () => {

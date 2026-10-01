@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -15,12 +15,93 @@ const runner = fileURLToPath(new URL("../scripts/benchmark.mjs", import.meta.url
 const child = (code, options = {}) =>
   measureProcess(["--import", resourceHook, "-e", code], { env: {}, ...options })
 
+test("benchmark targets another build and identifies contract failures without echoing payloads", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "crispctl-bench-target-"))
+  try {
+    mkdirSync(join(directory, "dist"))
+    writeFileSync(
+      join(directory, "package.json"),
+      JSON.stringify({ type: "module", version: "9.9.9" }),
+    )
+    const bin = join(directory, "dist/index.js")
+    writeFileSync(bin, 'console.log("9.9.9")')
+    const args = [
+      runner,
+      "--target",
+      directory,
+      "--scenario",
+      "version",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--json",
+    ]
+    const { stdout, stderr } = await promisify(execFile)(process.execPath, args, {
+      env: {},
+      timeout: 5000,
+    })
+    assert.equal(stderr, "")
+    const report = JSON.parse(stdout)
+    assert.equal(report.version, "9.9.9")
+    assert.equal(report.revision, null)
+    writeFileSync(bin, 'console.log("private synthetic payload"); process.exitCode = 1')
+    await assert.rejects(
+      promisify(execFile)(process.execPath, args, { env: {}, timeout: 5000 }),
+      (error) => {
+        assert.match(error.stderr, /version: output contract failed \(exit 1, signal null\)/)
+        assert.doesNotMatch(error.stderr, /private synthetic payload/)
+        return true
+      },
+    )
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test(
+  "component benchmark validates all synthetic stages and reports bounded samples",
+  { timeout: 15000 },
+  async () => {
+    const script = fileURLToPath(new URL("../scripts/benchmark-stages.mjs", import.meta.url))
+    const { stdout, stderr } = await promisify(execFile)(
+      process.execPath,
+      [script, "--samples", "1"],
+      { env: {}, timeout: 12000 },
+    )
+    assert.equal(stderr, "")
+    const report = JSON.parse(stdout)
+    assert.equal(report.results.length, 9)
+    for (const result of report.results) {
+      assert.equal(result.samplesMs.length, 1)
+      assert.ok(result.summaryMs.p50 > 0)
+    }
+  },
+)
+
 test("benchmark uses nearest-rank tail percentiles without mutating samples", () => {
   const values = [100, ...Array.from({ length: 19 }, (_, index) => index + 1)]
   assert.deepEqual(summarize(values), { min: 1, p50: 10, p95: 19, max: 100 })
   assert.equal(values[0], 100)
   assert.deepEqual(summarize([4]), { min: 4, p50: 4, p95: 4, max: 4 })
   for (const invalid of [[], [-1], [NaN], [Infinity]]) assert.throws(() => summarize(invalid))
+})
+
+test("output soak validates every record and reports post-GC samples without a timing gate", async () => {
+  const script = fileURLToPath(new URL("../scripts/benchmark-output-soak.mjs", import.meta.url))
+  const { stdout, stderr } = await promisify(execFile)(process.execPath, ["--expose-gc", script], {
+    env: {},
+    timeout: 10000,
+  })
+  assert.equal(stderr, "")
+  const report = JSON.parse(stdout)
+  assert.equal(report.measuredRecords, 100000)
+  assert.equal(report.warmupRecords, 5000)
+  assert.deepEqual(
+    report.snapshots.map((sample) => sample.received),
+    [5000, 25000, 45000, 65000, 85000, 105000],
+  )
+  assert.ok(report.snapshots.every((sample) => sample.heapUsedMiB > 0 && sample.rssMiB > 0))
 })
 
 test("benchmark measures stderr feedback and retains unsuccessful exits for validation", async () => {
@@ -81,7 +162,7 @@ test(
       assert.equal(stderr, "")
       const report = JSON.parse(stdout)
       assert.equal(report.schemaVersion, 1)
-      assert.equal(report.results.length, 12)
+      assert.equal(report.results.length, 16)
       assert.equal(report.samples, 1)
       const slow = report.results.find((result) => result.name === "rest-slow-reader").samples[0]
       assert.equal(slow.readerPauseMs, Math.floor(slow.stdoutBytes / (64 * 1024)) * 5)

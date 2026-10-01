@@ -1,4 +1,4 @@
-import { io, type Socket } from "socket.io-client"
+import type { io, Socket } from "socket.io-client"
 import type { CrispClient, ClientCredentials } from "./client.js"
 import { CrispApiError, UsageError } from "./errors.js"
 import { assertEventTiers } from "./rtm-events.js"
@@ -96,14 +96,15 @@ export async function listen(
   }
 }
 
-function connection(
+async function connection(
   endpoint: URL,
   creds: ClientCredentials,
   options: ListenOptions,
   onEvent: (event: RtmEvent) => boolean,
 ): Promise<"done" | "connected" | "retry"> {
+  const connect = options.socketFactory ?? (await import("socket.io-client")).io
   return new Promise((resolve, reject) => {
-    const socket = (options.socketFactory ?? io)(endpoint.origin, {
+    const socket = connect(endpoint.origin, {
       path: endpoint.pathname,
       query: Object.fromEntries(endpoint.searchParams),
       transports: ["websocket"],

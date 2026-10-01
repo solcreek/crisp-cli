@@ -7,6 +7,30 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Measure a reused output pipeline over 100,000 validated records with periodic
+  GC memory samples using `npm run bench:soak`.
+
+- Compare built checkouts with the same benchmark fixtures, including stored
+  configuration, read-only rejection and HTTP errors; measure warm command,
+  configuration, response, redaction and output-queue batches separately.
+
+### Changed
+
+- Drain large output bursts using a bounded, compacting queue cursor while
+  preserving byte limits, ordering, cancellation and backpressure handling.
+
+- Compile credential-redaction patterns once per JSON serialization instead of
+  once per property and string, keeping secret snapshots isolated.
+
+- Construct only the options declared by each command, preserving fresh command
+  trees and the existing help and parsing contracts.
+
+- Load command operations and network transports only when needed, reducing
+  help, configuration and validation startup costs while preserving cancellation
+  across asynchronous module loading.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added

@@ -13,6 +13,10 @@ if (endpoint) {
   pool
     .intercept({ method: "GET", path: "/v1/website/benchmark-site/connect/endpoints" })
     .reply(200, { error: false, data: { socket: { app: endpoint } } })
+} else if (process.env.CRISPCTL_BENCH_HTTP_ERROR === "1") {
+  pool
+    .intercept({ method: "GET", path: "/v1/website/benchmark-site/conversations/1" })
+    .reply(429, { error: true, reason: "rate_limited" }, { headers: { "retry-after": "3" } })
 } else {
   const count = process.env.CRISPCTL_BENCH_LARGE === "1" ? 1024 : 1
   pool.intercept({ method: "GET", path: "/v1/website/benchmark-site/conversations/1" }).reply(200, {

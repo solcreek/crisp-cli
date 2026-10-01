@@ -21,6 +21,29 @@ function capture() {
   }
 }
 
+test("sink preserves a large burst through compaction and can be reused after draining", async () => {
+  let received = 0
+  const stream = new Writable({
+    write(chunk, _encoding, callback) {
+      assert.equal(chunk.toString(), `${received++}\n`)
+      queueMicrotask(callback)
+    },
+  })
+  const sink = new OutputSink(stream, () => assert.fail("must not stop"), "stdout")
+  try {
+    for (let i = 0; i < 15000; i++) sink.write(`${i}\n`)
+    await sink.flush()
+    assert.equal(received, 15000)
+    sink.write("15000\n")
+    await sink.flush()
+    assert.equal(received, 15001)
+    assert.equal(stream.writableLength, 0)
+  } finally {
+    sink.dispose()
+    stream.destroy()
+  }
+})
+
 test("sink waits for each write, preserves UTF-8 order and flushes all waiters", async () => {
   const chunks: string[] = []
   const callbacks: (() => void)[] = []

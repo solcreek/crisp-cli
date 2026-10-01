@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { once } from "node:events"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createServer } from "node:https"
 import { arch, cpus, platform, tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { fileURLToPath } from "node:url"
 import { Server } from "socket.io"
@@ -13,7 +13,6 @@ import { measureProcess, summarize } from "./benchmark-process.mjs"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const path = (relative) => join(root, relative)
-const cli = path("dist/index.js")
 const resources = path("scripts/fixtures/benchmark-resources.mjs")
 const api = path("scripts/fixtures/benchmark-api.mjs")
 const cert = path("test/fixtures/localhost-cert.pem")
@@ -23,8 +22,20 @@ const scenarios = [
   { name: "help", args: ["--help"], kind: "help" },
   { name: "nested-help", args: ["conversations", "pages", "--help"], kind: "help" },
   { name: "usage-error", args: ["conversations", "pages", "--json"], kind: "usage" },
+  {
+    name: "invalid-page",
+    args: ["conversations", "pages", "synthetic-session", "--page", "0", "--json"],
+    kind: "usage",
+  },
+  {
+    name: "read-only-write",
+    args: ["reply", "synthetic-session", "--text", "synthetic", "--json"],
+    kind: "usage",
+  },
+  { name: "auth-file", args: ["auth", "show", "--json"], kind: "auth" },
   { name: "event-catalog", args: ["listen", "--list-events", "--json"], kind: "catalog" },
   { name: "rest-small", kind: "rest", count: 1 },
+  { name: "rest-error", kind: "rest", error: true },
   { name: "rest-large", kind: "rest", count: 1024 },
   { name: "rest-slow-reader", kind: "rest", count: 1024, pauseMs: 5 },
   { name: "rtm-first-event", kind: "rtm", count: 1 },
@@ -40,11 +51,15 @@ function options() {
       scenario: { type: "string", multiple: true },
       json: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
+      target: { type: "string", default: root },
     },
   })
   if (values.help) {
     console.log("Usage: npm run bench -- [--samples 30] [--warmup 3] [--scenario NAME] [--json]")
     console.log(`Scenarios: ${scenarios.map((scenario) => scenario.name).join(", ")}`)
+    console.log(
+      "--target DIR measures an already-built checkout; fixtures come from this benchmark.",
+    )
     return null
   }
   for (const [key, min, max] of [
@@ -62,13 +77,21 @@ function options() {
     samples: Number(values.samples),
     warmup: Number(values.warmup),
     json: values.json,
+    target: resolve(values.target),
     scenarios: scenarios.filter((scenario) => selected.includes(scenario.name)),
   }
 }
 
 function validate(scenario, result, version) {
   assert.equal(result.signal, null)
-  assert.equal(result.code, scenario.kind === "usage" ? 2 : 0)
+  assert.equal(result.code, scenario.kind === "usage" ? 2 : scenario.error ? 1 : 0)
+  if (scenario.error) {
+    assert.equal(result.stdout, "")
+    const error = JSON.parse(result.stderr)
+    assert.equal(error.error, "rate_limited")
+    assert.equal(error.retry_after, "3")
+    return
+  }
   if (scenario.kind === "usage") {
     assert.equal(result.stdout, "")
     assert.equal(JSON.parse(result.stderr).error, "usage")
@@ -82,6 +105,13 @@ function validate(scenario, result, version) {
     case "version":
       assert.equal(result.stdout.trim(), version)
       break
+    case "auth": {
+      const profile = JSON.parse(result.stdout)
+      assert.equal(profile.key, "set")
+      assert.equal(profile.website_id, "benchmark-site")
+      assert.equal(profile.sources.key, "file")
+      break
+    }
     case "help":
       assert.match(result.stdout, /Usage:/)
       assert.match(result.stdout, /--json/)
@@ -133,7 +163,9 @@ function validate(scenario, result, version) {
 async function main() {
   const config = options()
   if (!config) return
-  const pkg = JSON.parse(readFileSync(path("package.json"), "utf8"))
+  const target = config.target
+  const cli = join(target, "dist/index.js")
+  const pkg = JSON.parse(readFileSync(join(target, "package.json"), "utf8"))
   const directory = mkdtempSync(join(tmpdir(), "crispctl-benchmark-"))
   // An allowlist isolates user configuration, credentials, coverage and Node hooks.
   const env = {
@@ -143,6 +175,20 @@ async function main() {
     LANG: "C",
     TZ: "UTC",
   }
+  const profileFile = join(directory, "profile.json")
+  writeFileSync(
+    profileFile,
+    JSON.stringify({
+      profiles: {
+        default: {
+          identifier: "benchmark-identifier",
+          key: "benchmark-key",
+          tier: "website",
+          website_id: "benchmark-site",
+        },
+      },
+    }),
+  )
   let sockets
   let endpoint
   let activeCount = 0
@@ -173,6 +219,7 @@ async function main() {
     async function sample(scenario) {
       activeCount = scenario.count ?? 0
       const childEnv = { ...env }
+      if (scenario.kind === "auth") childEnv.CRISPCTL_CONFIG = profileFile
       const args = ["--import", resources]
       if (scenario.kind === "rest" || scenario.kind === "rtm") {
         args.push("--import", api)
@@ -186,6 +233,7 @@ async function main() {
       if (scenario.kind === "node") args.push(...scenario.args)
       else if (scenario.kind === "rest") {
         childEnv.CRISPCTL_BENCH_LARGE = scenario.count === 1024 ? "1" : "0"
+        childEnv.CRISPCTL_BENCH_HTTP_ERROR = scenario.error ? "1" : "0"
         args.push(cli, "conversations", "list", "--json")
       } else if (scenario.kind === "rtm") {
         childEnv.CRISPCTL_BENCH_ENDPOINT = endpoint
@@ -194,13 +242,19 @@ async function main() {
         if (!scenario.cancelAfterLine) args.push("--count", String(scenario.count))
       } else args.push(cli, ...scenario.args)
       const result = await measureProcess(args, {
-        cwd: root,
+        cwd: target,
         env: childEnv,
-        outputStream: scenario.kind === "usage" ? "stderr" : "stdout",
+        outputStream: scenario.kind === "usage" || scenario.error ? "stderr" : "stdout",
         pauseMs: scenario.pauseMs,
         cancelAfterLine: scenario.cancelAfterLine,
       })
-      validate(scenario, result, pkg.version)
+      try {
+        validate(scenario, result, pkg.version)
+      } catch {
+        throw new Error(
+          `${scenario.name}: output contract failed (exit ${result.code}, signal ${result.signal})`,
+        )
+      }
       return result.metrics
     }
     // Rotate scenario order to reduce bias from temperature or background work.
@@ -215,9 +269,17 @@ async function main() {
     let revision = null
     let dirty = null
     try {
-      revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim()
+      revision = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: target,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim()
       dirty = Boolean(
-        execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim(),
+        execFileSync("git", ["status", "--porcelain"], {
+          cwd: target,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        }).trim(),
       )
     } catch {
       /* A source archive need not contain Git metadata. */
@@ -269,7 +331,7 @@ async function main() {
       )
     }
   } finally {
-    if (sockets) await new Promise((resolve) => sockets.close(resolve))
+    if (sockets) await new Promise((done) => sockets.close(done))
     rmSync(directory, { recursive: true, force: true })
   }
 }
