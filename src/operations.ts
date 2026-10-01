@@ -10,6 +10,7 @@ import {
   selectedProfileName,
   type ConfigFile,
   type Tier,
+  type ResolvedCredentials,
 } from "./config.js"
 import { UsageError } from "./errors.js"
 import { usage } from "./help.js"
@@ -28,10 +29,7 @@ export function authSet(io: IO): number {
 }
 
 export function authShow(io: IO): number {
-  const creds = resolveCredentials(io.env, {
-    profile: io.flags.profile,
-    website: websiteOverride(io.flags),
-  })
+  const creds = credentialsFrom(io)
   writeOut(io.stdout, io.flags.json, publicProfileView(creds))
   return 0
 }
@@ -202,10 +200,7 @@ export async function listenCommand(io: IO): Promise<number> {
   if (timeout !== undefined && timeout > 2_147_483) throw new UsageError("--timeout is too large")
   const session =
     io.flags.session === undefined ? undefined : requireArg(io.flags.session, usage.listen)
-  const creds = resolveCredentials(io.env, {
-    profile: io.flags.profile,
-    website: websiteOverride(io.flags),
-  })
+  const creds = credentialsFrom(io)
   assertComplete(creds)
   const lifecycle = io.lifecycle ?? new RunLifecycle(io.signal)
   lifecycle.handleSignals()
@@ -234,10 +229,7 @@ function isReadOnly(io: IO): boolean {
 }
 
 function clientFrom(io: IO): CrispClient {
-  const creds = resolveCredentials(io.env, {
-    profile: io.flags.profile,
-    website: websiteOverride(io.flags),
-  })
+  const creds = credentialsFrom(io)
   assertComplete(creds)
   return new CrispClient(
     {
@@ -263,4 +255,14 @@ function firstSet(env: NodeJS.ProcessEnv, keys: readonly string[]): string | und
 function assertWritable(io: IO): void {
   if (isReadOnly(io)) throw new UsageError("read-only mode: write operations are disabled")
   io.signal?.throwIfAborted()
+}
+
+function credentialsFrom(io: IO): ResolvedCredentials {
+  return (
+    io.credentials?.resolve(io.flags) ??
+    resolveCredentials(io.env, {
+      profile: io.flags.profile,
+      website: websiteOverride(io.flags),
+    })
+  )
 }

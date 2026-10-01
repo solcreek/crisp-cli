@@ -15,6 +15,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Keep the credentials used by each invocation available for redaction even if
+  config or environment credentials rotate, and redact secrets in help topics.
 - Propagate cancellation through REST requests and response bodies, prevent
   cancelled writes and follow-up requests, and handle process signals while REST
   commands are running.
