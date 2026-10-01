@@ -28,7 +28,7 @@ Environment (overrides the selected profile):
 
 The token key is never printed. A config file written by crispctl is mode 0600.
 
-Development: use the Cos Crisp sandbox website. Production Teachify requires explicit authorization and --read-only.
+Development: use a dedicated test website. Production access requires explicit authorization and --read-only.
 `
 
 export const COMMAND_NOTES: Record<string, string> = {
