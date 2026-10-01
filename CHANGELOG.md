@@ -39,6 +39,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Bound and validate live-smoke NDJSON, terminate stalled child processes and
+  emit assertion metadata only; type-check and enforce coverage on the monitor.
+
 - Validate REST envelope field types and preserve HTTP error classification and
   retry metadata for malformed responses; bound decoded response bodies to 8 MiB
   and cancel oversized streams before JSON parsing.

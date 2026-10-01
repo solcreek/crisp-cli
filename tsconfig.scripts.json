@@ -1,9 +1,13 @@
 {
   "extends": "./tsconfig.test.json",
-  "compilerOptions": { "allowJs": true, "checkJs": true },
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true
+  },
   "include": [
     "scripts/registry.mjs",
     "scripts/installed-package-smoke.mjs",
-    "scripts/published-smoke.mjs"
+    "scripts/published-smoke.mjs",
+    "scripts/rtm-smoke-monitor.mjs"
   ]
 }

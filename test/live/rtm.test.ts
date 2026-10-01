@@ -28,7 +28,8 @@ test(
       .map((line) => JSON.parse(line))
     assert.ok(
       checks.some(
-        (value) => value.check === "website" && value.name === name && value.read_only === true,
+        (value) =>
+          value.check === "website" && value.website_matches === true && value.read_only === true,
       ),
     )
     assert.ok(checks.some((value) => value.check === "status" && value.status === "authenticated"))
