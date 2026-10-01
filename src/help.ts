@@ -13,7 +13,7 @@ export const usage = {
   read: "crispctl read <session>",
   peopleGet: "crispctl people get <id|email>",
   operatorsList: "crispctl operators list",
-  listen: "crispctl listen [--events <a,b>] [--session <id>] [--count <n>] [--timeout <seconds>]",
+  listen: "crispctl listen [--list-events] [--events <a,b>] [--session <id>] [--count <n>] [--timeout <seconds>]",
 } as const
 
 const globals = "Global flags: --json, --read-only, --profile <name>, --website <id>"
@@ -160,7 +160,11 @@ GET /v1/website/{website_id}/operators/list
   listen: `${usage.listen}
 
 Streams message:send, message:received and session:set_state by default.
---events selects comma-separated RTM event names. --session filters locally.
+--list-events lists the official event catalog, token tiers and scopes without connecting.
+It cannot be combined with --events, --session, --count or --timeout.
+--events selects comma-separated RTM event names; known tier mismatches fail before connecting.
+--session filters locally, including email:track:view session identifiers.
+Bucket URL events match resource.type=website and resource.id to the selected website.
 --json writes one {event,data,received_at} JSON object per line to stdout.
 Connection status goes to stderr. Ctrl-C stops cleanly; reconnects rediscover endpoints.
 --count stops after N matching events. --timeout sets a total deadline (exit 1).

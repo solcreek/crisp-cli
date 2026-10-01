@@ -4,6 +4,8 @@ import { test } from "node:test"
 import type { Socket } from "socket.io-client"
 import { CrispClient, type ClientCredentials } from "../src/client.js"
 import { run } from "../src/cli.js"
+import { RTM_EVENTS } from "../src/rtm-events.js"
+import { eventPayload, reference } from "./rtm-reference.js"
 import { CrispApiError } from "../src/errors.js"
 import { listen, parseEvents, positiveInteger, socketEndpoint, type ListenOptions, type SocketFactory } from "../src/rtm.js"
 import { buffers, credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from "./support.js"
@@ -166,4 +168,200 @@ test("CLI validates listen flags and deadline, aborts and reports timeout on std
     controller.abort()
     assert.equal(await run(["listen"], { ...buffers(), env, signal: controller.signal }), 0)
   } finally { removeHome(env) }
+})
+
+test("catalog covers every referenced event and can be listed without credentials or network", async () => {
+  assert.equal(reference.events.length, 82)
+  assert.equal(new Set(reference.events.map(item => item.event)).size, 82)
+  assert.deepEqual(RTM_EVENTS, reference.events.map(({ event, tiers, scopes }) => ({ event, tiers, scopes })))
+  for (const [tier, count] of [["website", 71], ["plugin", 72]] as const) {
+    assert.equal(reference.events.filter(item => item.tiers.includes(tier)).length, count)
+  }
+  const env = credentialEnv({ CRISP_KEY: undefined })
+  try {
+    const io = buffers()
+    assert.equal(await run(["listen", "--list-events", "--json", "--read-only"], { ...io, env }), 0)
+    assert.deepEqual(JSON.parse(io.out()), { source: reference.source, checked_at: reference.checked_at, events: RTM_EVENTS })
+    assert.equal(io.err(), "")
+    assert.equal(await run(["listen", "--list-events", "--events", "message:send"], { ...buffers(), env }), 2)
+    assert.equal(await run(["operators", "list", "--list-events"], { ...buffers(), env }), 2)
+  } finally { removeHome(env) }
+})
+
+for (const definition of reference.events) {
+  for (const tier of ["website", "plugin"] as const) {
+    test(`reference contract ${tier}: ${definition.event}`, async () => {
+      const selected = { ...creds, tier }
+      if (!definition.tiers.includes(tier)) {
+        await assert.rejects(listen({ getConnectEndpoints: async () => { throw new Error("must not contact Crisp") } }, selected,
+          options(() => { throw new Error("must not connect") }, { events: [definition.event] })), /requires token tier/)
+        return
+      }
+      const payload = eventPayload(definition)
+      const events: unknown[] = []
+      const h = harness((auth, socket) => {
+        assert.equal(auth.tier, tier)
+        assert.deepEqual(auth.events, [definition.event])
+        assert.deepEqual(auth.rooms, [creds.websiteId])
+        socket.receive("authenticated")
+        socket.receive(definition.event, eventPayload(definition, "another-website"))
+        socket.receive(definition.event, payload)
+      })
+      await listen({ getConnectEndpoints: async () => endpoint }, selected, options(h.factory, {
+        events: parseEvents(definition.event), count: 1, onEvent: event => events.push(event.data),
+      }))
+      assert.deepEqual(events, [payload])
+      assert.ok(h.sockets.every(socket => socket.closed))
+    })
+  }
+}
+
+test("bucket routing rejects ambiguous resources and conflicting website IDs", async () => {
+  const definition = reference.events.find(item => item.event === "bucket:url:upload:generated")!
+  const valid = eventPayload(definition)
+  const invalid = [null, [], 1, "event", {}, { identifier: creds.websiteId },
+    { resource: null }, { resource: [] }, { resource: { type: "user", id: creds.websiteId } },
+    { resource: { type: "website", id: "other" } }, { ...valid, website_id: "other" }]
+  const received: unknown[] = []
+  const h = harness((_auth, socket) => {
+    socket.receive("authenticated")
+    for (const payload of invalid) socket.receive(definition.event, payload)
+    socket.receive(definition.event, { ...valid, website_id: creds.websiteId })
+  })
+  await listen({ getConnectEndpoints: async () => endpoint }, creds, options(h.factory, {
+    events: [definition.event], count: 1, onEvent: event => received.push(event.data),
+  }))
+  assert.deepEqual(received, [{ ...valid, website_id: creds.websiteId }])
+})
+
+test("session filter supports email tracking identifiers and excludes unscoped events", async () => {
+  const events = ["email:track:view", "people:profile:created", "plugin:event", "bucket:url:upload:generated", "message:send"]
+  const received: string[] = []
+  const h = harness((_auth, socket) => {
+    socket.receive("authenticated")
+    socket.receive("email:track:view", { website_id: creds.websiteId, type: "session", identifier: "other" })
+    socket.receive("email:track:view", { website_id: creds.websiteId, type: "campaign", identifier: FIXTURE.session })
+    socket.receive("people:profile:created", { website_id: creds.websiteId })
+    socket.receive("plugin:event", { website_id: creds.websiteId, data: { session_id: FIXTURE.session } })
+    socket.receive("bucket:url:upload:generated", { resource: { type: "website", id: creds.websiteId } })
+    socket.receive("email:track:view", { website_id: creds.websiteId, type: "session", identifier: FIXTURE.session })
+    socket.receive("message:send", { website_id: creds.websiteId, session_id: FIXTURE.session })
+  })
+  await listen({ getConnectEndpoints: async () => endpoint }, creds, options(h.factory, {
+    events, session: FIXTURE.session, count: 2, onEvent: event => received.push(event.event),
+  }))
+  assert.deepEqual(received, ["email:track:view", "message:send"])
+})
+
+test("future event names pass through without weakening website isolation", async () => {
+  const event = "future:new:event"
+  const received: unknown[] = []
+  const h = harness((_auth, socket) => {
+    socket.receive("authenticated")
+    socket.receive(event, { resource: { type: "website", id: creds.websiteId } })
+    socket.receive(event, { website_id: creds.websiteId })
+  })
+  await listen({ getConnectEndpoints: async () => endpoint }, creds, options(h.factory, {
+    events: parseEvents(event), count: 1, onEvent: event => received.push(event.data),
+  }))
+  assert.deepEqual(received, [{ website_id: creds.websiteId }])
+})
+
+test("cancellation during discovery never opens a socket or schedules a retry", async () => {
+  for (const reject of [false, true]) {
+    const controller = new AbortController()
+    const discovery = { getConnectEndpoints: async (signal?: AbortSignal) => {
+      assert.equal(signal, controller.signal)
+      controller.abort()
+      if (reject) throw new CrispApiError(0, "network_error", "aborted")
+      return endpoint
+    } }
+    await listen(discovery, creds, options(() => { throw new Error("must not open socket") }, {
+      signal: controller.signal, onStatus: () => { throw new Error("must not retry") },
+    }))
+  }
+})
+
+test("cancellation during socket creation disposes an unconnected socket", async () => {
+  const controller = new AbortController()
+  const socket = new TestSocket(() => { throw new Error("must not authenticate") })
+  await listen({ getConnectEndpoints: async () => endpoint }, creds, options(() => {
+    controller.abort()
+    return socket as unknown as Socket
+  }, { signal: controller.signal }))
+  assert.equal(socket.closed, true)
+  assert.deepEqual(socket.eventNames(), [])
+})
+
+test("disconnect before authentication retries without forwarding early events", async () => {
+  let attempt = 0
+  const statuses: string[] = []
+  const events: unknown[] = []
+  const h = harness((_auth, socket) => {
+    if (++attempt === 1) {
+      socket.receive("message:send", { website_id: creds.websiteId })
+      socket.receive("disconnect")
+    } else {
+      socket.receive("authenticated")
+      socket.receive("message:send", { website_id: creds.websiteId })
+    }
+  })
+  await listen({ getConnectEndpoints: async () => endpoint }, creds, options(h.factory, {
+    count: 1, onStatus: value => statuses.push(value.status), onEvent: value => events.push(value),
+  }))
+  assert.equal(events.length, 1)
+  assert.deepEqual(statuses, ["reconnecting", "authenticated"])
+  assert.ok(h.sockets.every(socket => socket.closed))
+})
+
+for (const status of [0, 429, 500, 502, 503, 504]) {
+  test(`discovery HTTP ${status} retries and recovers`, async () => {
+    let attempts = 0
+    const h = harness((_auth, socket) => {
+      socket.receive("authenticated")
+      socket.receive("message:send", { website_id: creds.websiteId })
+    })
+    await listen({ getConnectEndpoints: async () => {
+      if (++attempts === 1) throw new CrispApiError(status, "temporary", "temporary")
+      return endpoint
+    } }, creds, options(h.factory, { count: 1 }))
+    assert.equal(attempts, 2)
+  })
+}
+
+for (const status of [400, 401, 403, 404]) {
+  test(`discovery HTTP ${status} fails without retrying`, async () => {
+    let attempts = 0
+    const h = harness(() => {})
+    await assert.rejects(listen({ getConnectEndpoints: async () => {
+      attempts++
+      throw new CrispApiError(status, "rejected", "rejected")
+    } }, creds, options(h.factory)), /rejected/)
+    assert.equal(attempts, 1)
+    assert.equal(h.sockets.length, 0)
+  })
+}
+
+test("unexpected discovery errors propagate without retrying", async () => {
+  await assert.rejects(listen({ getConnectEndpoints: async () => { throw new Error("unexpected failure") } },
+    creds, options(() => { throw new Error("must not connect") })), /unexpected failure/)
+})
+
+test("reconnection uses a changed endpoint origin, path and query", async () => {
+  const endpoints = ["wss://first.example.invalid/rtm/?region=a", "wss://second.example.invalid/new-rtm/?region=b&token=fixture"]
+  const opened: { url: string; path: unknown; query: unknown }[] = []
+  let discoveries = 0
+  await listen({ getConnectEndpoints: async () => ({ socket: { app: endpoints[discoveries++] } }) }, creds, options((url, opts) => {
+    opened.push({ url, path: opts?.path, query: opts?.query })
+    const socket = new TestSocket((_auth, active) => {
+      active.receive("authenticated")
+      if (discoveries === 1) active.receive("disconnect")
+      else active.receive("message:send", { website_id: creds.websiteId })
+    })
+    return socket as unknown as Socket
+  }, { count: 1 }))
+  assert.deepEqual(opened, [
+    { url: "wss://first.example.invalid", path: "/rtm/", query: { region: "a" } },
+    { url: "wss://second.example.invalid", path: "/new-rtm/", query: { region: "b", token: "fixture" } },
+  ])
 })

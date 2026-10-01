@@ -18,3 +18,11 @@ uses the real socket.io-client against a real local Socket.IO server.
 mock-smoke-child.mjs simulates the live smoke helper dependencies in an isolated
 child process, including stdout arriving after process exit. It uses fixture
 credentials and never contacts 1Password or Crisp.
+
+rtm-reference.json records event names, token tiers, scopes and routing field paths
+from the official RTM v1 reference (checked 2026-10-01, page updated 2026-02-12).
+The website:update_visitors_count tier markup `user``website` is normalized to
+separate user and website tiers. The malformed session:sync:pages sample timestamp
+does not affect the captured top-level routing fields. Synthetic test payloads
+are built in test/rtm-reference.ts; no customer data or document sample secrets
+are copied. The optional check:rtm-reference script detects event/tier/scope drift.

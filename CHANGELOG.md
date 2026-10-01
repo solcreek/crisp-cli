@@ -7,8 +7,18 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `listen --list-events` to inspect all documented RTM event names, token tiers,
+  and scopes without connecting, with early rejection of known tier mismatches.
+- RTM contract coverage for every website/plugin-eligible event, WSS E2E checks
+  for both token tiers, and a dedicated RTM coverage gate in CI.
+
 ### Fixed
 
+- Forward bucket URL events whose website is identified by `resource.id`, while
+  rejecting other resource types, websites, and conflicting routing identifiers.
+- Match `email:track:view` session events by `identifier` when using `--session`.
 - Prevent false RTM live smoke failures by waiting for child output streams to close
   before counting received events and reporting the result.
 

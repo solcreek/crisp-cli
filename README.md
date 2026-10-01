@@ -107,13 +107,16 @@ CRISPCTL_READ_ONLY=1 crispctl listen --json
 
 ```bash
 crispctl listen --json --read-only
+crispctl listen --list-events --json
 crispctl listen --json --events message:send,session:set_state --session session_...
 crispctl listen --json --events message:send --count 1 --timeout 60
 ```
 
 `listen` is always read-only. It discovers the current `socket.app` endpoint via REST, connects over secure Socket.IO, authenticates with the selected website or plugin token, and subscribes only to the selected website. Website tokens use `GET /v1/website/{website_id}/connect/endpoints`; plugin tokens use `GET /v1/plugin/connect/endpoints`.
 
-The default events are `message:send`, `message:received`, and `session:set_state`. `--events` selects comma-separated event names; token scopes must allow them. `--session` filters received events locally. `--json` writes newline-delimited JSON to stdout:
+The event catalog was checked against all 82 namespaces in the official RTM v1 reference on 2026-10-01. Website tokens are eligible for 71 events and plugin tokens for 72, subject to Crisp permissions. `listen --list-events --json` lists names, tiers and documented scopes without credentials or a connection. Known tier mismatches fail before connecting; valid unknown names remain accepted for future Crisp additions. The 10 user-only namespaces require an unsupported token tier. See the [RTM coverage matrix](docs/rtm-coverage.md) for every event and the limits of this verification.
+
+The default events are `message:send`, `message:received`, and `session:set_state`. `--events` selects comma-separated event names; token scopes must allow them. `--session` filters received events locally by `session_id`, or by `identifier` for `email:track:view` when `type` is `session`. Events with no recognized session identifier are excluded by this filter; arbitrary plugin payload fields are not interpreted as routing metadata. Bucket URL events use `resource.type === "website"` and `resource.id` to match the website, instead of a top-level `website_id`. `--json` writes newline-delimited JSON to stdout:
 
 ```json
 {"event":"session:set_state","data":{"website_id":"...","session_id":"session_...","state":"resolved"},"received_at":"2026-10-01T12:00:00.000Z"}
@@ -154,7 +157,7 @@ npm run typecheck
 
 E2E endpoint discovery is intercepted in the child process; RTM uses actual Socket.IO over TLS on loopback. The test-only certificate is trusted by that child via `NODE_EXTRA_CA_CERTS`; TLS verification stays enabled. Test fixtures contain no real credentials.
 
-Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
+Aggregate coverage is enforced across all `src/` files, including unimported files: **95% lines/statements/functions and 85% branches**. A separate `npm run test:rtm` gate requires 100% lines/statements/functions and at least 95% branches across `src/rtm*.ts`, and runs on both CI Node versions. `npm run check:rtm-reference` optionally checks catalog drift against the live official reference; it is not part of offline CI. Coverage thresholds complement behavior assertions; E2E and live checks verify transport behavior that a high unit coverage number alone cannot establish.
 
 ### Live smoke
 

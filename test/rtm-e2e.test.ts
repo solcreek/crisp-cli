@@ -7,6 +7,8 @@ import type { AddressInfo } from "node:net"
 import { test, type TestContext } from "node:test"
 import { fileURLToPath } from "node:url"
 import { Server, type Socket } from "socket.io"
+import { eventPayload, reference } from "./rtm-reference.js"
+import type { Tier } from "../src/config.js"
 import { credentialEnv, FIXTURE, removeHome } from "./support.js"
 
 const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.url))
@@ -19,13 +21,13 @@ async function server(t: TestContext, authenticate: (socket: Socket, payload: an
   t.after(() => new Promise<void>(resolve => sockets.close(() => resolve())))
   return `wss://127.0.0.1:${(https.address() as AddressInfo).port}/rtm/`
 }
-function cli(t: TestContext, endpoint: string, args: string[]) {
+function cli(t: TestContext, endpoint: string, args: string[], tier: Tier = "website") {
   const env = credentialEnv({ CRISP_TIER: "website" })
   const child = spawn(process.execPath, ["--import", path("./fixtures/mock-crisp.mjs"), path("../dist/index.js"), ...args], {
     env: {
       ...process.env, ...env,
       CRISPCTL_IDENTIFIER: FIXTURE.identifier, CRISPCTL_KEY: FIXTURE.key,
-      CRISPCTL_WEBSITE_ID: FIXTURE.websiteId, CRISPCTL_TIER: "website", CRISPCTL_READ_ONLY: "1",
+      CRISPCTL_WEBSITE_ID: FIXTURE.websiteId, CRISPCTL_TIER: tier, CRISPCTL_READ_ONLY: "1",
       CRISPCTL_CONFIG: `${env.HOME}/config.json`, NODE_EXTRA_CA_CERTS: path("./fixtures/localhost-cert.pem"),
       CRISPCTL_TEST_ENDPOINT: endpoint,
     },
@@ -110,3 +112,28 @@ test("E2E read-only rejects a write with exit 2 before HTTP or socket access", {
   assert.equal(result.stdout, "")
   assert.match(JSON.parse(result.stderr).message, /read-only mode/)
 })
+
+
+for (const tier of ["website", "plugin"] as const) {
+  test(`E2E ${tier} token forwards every documented eligible event over WSS`, { timeout: 15_000 }, async t => {
+    const definitions = reference.events.filter(item => item.tiers.includes(tier))
+    let authentication: unknown
+    const endpoint = await server(t, (socket, payload) => {
+      authentication = payload
+      socket.emit("authenticated")
+      for (const definition of definitions) {
+        socket.emit(definition.event, eventPayload(definition, "another-website"))
+        socket.emit(definition.event, eventPayload(definition))
+      }
+    })
+    const result = await cli(t, endpoint, ["listen", "--json", "--events", definitions.map(item => item.event).join(","),
+      "--count", String(definitions.length), "--timeout", "10"], tier).completed
+    assert.equal(result.code, 0, result.stderr)
+    assert.deepEqual(authentication, { tier, username: FIXTURE.identifier, password: FIXTURE.key,
+      events: definitions.map(item => item.event), rooms: [FIXTURE.websiteId] })
+    const events = result.stdout.trim().split("\n").map(line => JSON.parse(line))
+    assert.deepEqual(events.map(({ event, data }) => ({ event, data })),
+      definitions.map(definition => ({ event: definition.event, data: eventPayload(definition) })))
+    assert.equal(result.discoveries, 1)
+  })
+}
