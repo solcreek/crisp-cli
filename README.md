@@ -10,7 +10,7 @@ Use the **Cos Crisp sandbox** website for development and write tests. Productio
 
 ## Install
 
-Requires Node.js 20 or newer.
+Requires Node.js 22.12 or newer.
 
 ```bash
 npm install -g crispctl
@@ -161,7 +161,7 @@ npm run typecheck
 npm run verify
 ```
 
-`npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 20 and 24. No Crisp credentials or external services are needed.
+`npm test` builds the CLI and runs all offline tests with coverage. CI tests Node.js 22 and 24. No Crisp credentials or external services are needed.
 
 `npm run verify` runs typecheck, offline tests, the RTM coverage gate and
 `test:package`. The package smoke installs an actual tarball into a temporary
@@ -221,7 +221,7 @@ Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishe
 1. Set the release version in `package.json` and update `package-lock.json` to match.
 2. Move the `Unreleased` entries into a new version section dated `YYYY-MM-DD`. Keep an empty `Unreleased` section above it and update the version and comparison links at the bottom of `CHANGELOG.md`.
 3. Commit the release preparation and tag it `vX.Y.Z`, matching the package version, then push the tag.
-4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 20 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
+4. `.github/workflows/publish.yml` runs on tags `v*`. Publishing waits for the shared verification workflow to pass on both Node 22 and 24, including typecheck, both coverage gates and installed-package smoke. The publish job uses Node 24, `id-token: write` and `package-manager-cache: false`. Before build or publish it requires `GITHUB_REF_NAME` to equal `v` plus the package version, then runs `npm ci`, `npm run build` and `npm publish`.
 
 Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the same
 `.github/workflows/verify.yml` as releases. No live Crisp calls are included.

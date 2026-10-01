@@ -16,7 +16,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "repository": {
     "type": "git",
@@ -41,6 +41,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "commander": "15.0.0",
     "socket.io-client": "^4.8.4",
     "undici": "^6.21.2"
   },
@@ -53,9 +54,16 @@
   },
   "c8": {
     "all": true,
-    "src": ["src"],
-    "include": ["src/**/*.ts"],
-    "reporter": ["text", "text-summary"],
+    "src": [
+      "src"
+    ],
+    "include": [
+      "src/**/*.ts"
+    ],
+    "reporter": [
+      "text",
+      "text-summary"
+    ],
     "check-coverage": true,
     "lines": 95,
     "statements": 95,

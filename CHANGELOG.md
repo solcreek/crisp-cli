@@ -7,6 +7,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Require Node.js 22.12 or newer for Commander 15; verify Node 22 and 24 before
+  publishing.
+
 ### Fixed
 
 - Redact credentials from API error reasons and Retry-After values as well as
