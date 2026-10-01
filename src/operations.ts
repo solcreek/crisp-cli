@@ -1,4 +1,4 @@
-import { pageNumber, requireArg, websiteOverride, type Flags } from "./args.js"
+import { pageNumber, positiveInteger, requireArg, websiteOverride, type Flags } from "./args.js"
 import { CrispClient } from "./client.js"
 import {
   assertComplete,
@@ -15,7 +15,7 @@ import {
 import { UsageError } from "./errors.js"
 import { usage } from "./help.js"
 import { writeOut } from "./output.js"
-import { listen, parseEvents, positiveInteger } from "./rtm.js"
+import { listen, parseEvents } from "./rtm.js"
 import { RTM_EVENTS, RTM_REFERENCE_CHECKED, RTM_REFERENCE_URL } from "./rtm-events.js"
 import { redactSecrets } from "./redact.js"
 import { RunLifecycle } from "./lifecycle.js"

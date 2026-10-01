@@ -1,3 +1,4 @@
+import { positiveInteger } from "../src/args.js"
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
 import { test } from "node:test"
@@ -10,7 +11,6 @@ import { CrispApiError } from "../src/errors.js"
 import {
   listen,
   parseEvents,
-  positiveInteger,
   socketEndpoint,
   type ListenOptions,
   type SocketFactory,

@@ -15,6 +15,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Reject page numbers outside JavaScript’s safe integer range instead of rounding
+  or sending `Infinity`; share numeric validation with RTM count and timeout flags.
 - Keep the credentials used by each invocation available for redaction even if
   config or environment credentials rotate, and redact secrets in help topics.
 - Propagate cancellation through REST requests and response bodies, prevent

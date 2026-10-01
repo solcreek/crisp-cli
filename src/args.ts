@@ -49,14 +49,17 @@ export function assertAllowedFlags(seen: Set<string>, allowed: readonly string[]
   }
 }
 
+export function positiveInteger(raw: string | undefined, flag: string): number | undefined {
+  if (raw === undefined) return undefined
+  const value = Number(raw)
+  if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(value)) {
+    throw new UsageError(`--${flag} must be a positive integer`)
+  }
+  return value
+}
+
 export function pageNumber(raw: string | undefined): number {
-  if (raw === undefined) {
-    return 1
-  }
-  if (!/^[1-9]\d*$/.test(raw)) {
-    throw new UsageError("--page must be a positive integer")
-  }
-  return Number(raw)
+  return positiveInteger(raw, "page") ?? 1
 }
 
 export function requireArg(value: string | undefined, usage: string): string {
