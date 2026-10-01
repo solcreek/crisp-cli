@@ -1,0 +1,44 @@
+{
+  "checked_at": "2026-10-01",
+  "node24": {
+    "version": "24.21.0",
+    "tests": 55,
+    "passed": 55,
+    "failed": 0,
+    "scope": "all adapters and real PTYs"
+  },
+  "node20": {
+    "version": "20.20.2",
+    "tests": 24,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 2,
+    "scope": "Commander 14 and Ink 6; native Crust checks skipped"
+  },
+  "typecheck": {
+    "versions": [
+      "7.0.2",
+      "5.8.3"
+    ],
+    "passed": true,
+    "includes_expected_type_errors": true
+  },
+  "focused_followups": {
+    "global_help": {
+      "passed": 5
+    },
+    "pty_metadata": {
+      "passed": 2
+    }
+  },
+  "crust_typescript_peer_probe": {
+    "typescript": "5.8.3",
+    "core": "0.5.2",
+    "extensions": "0.5.2",
+    "command": "npm install --package-lock-only --ignore-scripts --dry-run",
+    "exit_code": 1,
+    "diagnostic": "npm error code ERESOLVE\nnpm error ERESOLVE unable to resolve dependency tree\nnpm error\nnpm error While resolving: undefined@undefined\nnpm error Found: typescript@5.8.3\nnpm error node_modules/typescript\nnpm error   dev typescript@\"5.8.3\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peerOptional typescript@\"^7.0.0\" from @crustjs/extensions@0.5.2\nnpm error node_modules/@crustjs/extensions\nnpm error   @crustjs/extensions@\"0.5.2\" from the root project\nnpm error"
+  },
+  "live_crisp_test": false,
+  "note": "POC tests use fixture operations; successful characterization includes the documented Crust separator difference."
+}

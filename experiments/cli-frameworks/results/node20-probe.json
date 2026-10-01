@@ -1,0 +1,23 @@
+{
+  "node": "v20.20.2",
+  "commander": {
+    "code": 0,
+    "stdout": "imported\n",
+    "stderr": ""
+  },
+  "@crustjs/core": {
+    "code": 1,
+    "stdout": "",
+    "stderr": "file://<poc>/node_modules/@crustjs/core/dist/invocation-OsKzCgr-.js:1727\n\tawait using disposal = new AsyncDisposableStack();\n\t            ^^^^^^^^\n\nSyntaxError: Unexpected identifier 'disposal'\n    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)\n    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:146:18)\n    at #translate (node:internal/modules/esm/loader:497:12)\n    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:544:27)\n\nNode.js v20.20.2\n"
+  },
+  "ink": {
+    "code": 0,
+    "stdout": "imported\n",
+    "stderr": ""
+  },
+  "crustExecute": {
+    "code": 1,
+    "stdout": "",
+    "stderr": "{\"ok\":false,\"error\":\"usage\",\"message\":\"Unexpected identifier 'disposal'\"}\n"
+  }
+}
