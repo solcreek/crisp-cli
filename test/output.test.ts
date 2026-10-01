@@ -2,8 +2,24 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { run } from "../src/cli.js"
 import { CrispApiError } from "../src/errors.js"
+import { jsonRedactor } from "../src/redact.js"
 import { errorPayload, writeErr, writeOut } from "../src/output.js"
 import { buffers, credentialEnv, FIXTURE, removeHome, withCrispMock } from "./support.js"
+
+test("structured redaction keeps patterns isolated across invocations and repeated strings", () => {
+  const first = jsonRedactor(["a.b", "a", "a.b", undefined, ""])
+  const second = jsonRedactor(["other-key"])
+  const payload = { "a.b": ["a.b a", "a.b", "other-key"], other: "aXb" }
+  assert.deepEqual(JSON.parse(JSON.stringify(payload, first)), {
+    "[redacted]": ["[redacted] [redacted]", "[redacted]", "other-key"],
+    other: "[redacted]Xb",
+  })
+  assert.deepEqual(JSON.parse(JSON.stringify(payload, second)), {
+    "a.b": ["a.b a", "a.b", "[redacted]"],
+    other: "aXb",
+  })
+  assert.equal(JSON.stringify(payload, jsonRedactor([undefined, ""])), JSON.stringify(payload))
+})
 
 test("API error payload redacts every remote string before JSON serialization", () => {
   const secret = 'token"\\\n.*$'

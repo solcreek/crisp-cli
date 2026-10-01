@@ -15,6 +15,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Compile credential-redaction patterns once per JSON serialization instead of
+  once per property and string, keeping secret snapshots isolated.
+
 - Construct only the options declared by each command, preserving fresh command
   trees and the existing help and parsing contracts.
 
