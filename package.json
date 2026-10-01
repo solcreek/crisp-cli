@@ -13,6 +13,7 @@
     "README.md",
     "CHANGELOG.md",
     "docs/rtm-coverage.md",
+    "docs/performance.md",
     "LICENSE"
   ],
   "engines": {
@@ -30,6 +31,7 @@
     "support"
   ],
   "scripts": {
+    "bench": "node scripts/build.mjs && node scripts/benchmark.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json",
     "verify": "npm run fmt:check && npm run lint && npm run typecheck && npm test && npm run coverage:rtm && npm run coverage:tooling && node scripts/package-smoke.mjs",

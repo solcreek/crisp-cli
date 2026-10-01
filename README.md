@@ -275,6 +275,24 @@ credential isolation and temporary-directory cleanup. RTM monitor tests cover
 UTF-8 boundaries, malformed/truncated/oversized NDJSON, spawn and stream errors,
 signal cleanup and watchdog escalation. Live checks remain separately opt-in.
 
+### Performance measurements
+
+`npm run bench` builds the CLI and measures fresh processes for help, version,
+usage errors, the event catalog, synthetic REST output, local TLS RTM events and
+graceful cancellation. It validates complete output before accepting each sample.
+No Crisp credentials or external API calls are used.
+
+```bash
+npm run bench
+npm run --silent bench -- --json > /tmp/crispctl-benchmark.json
+npm run bench -- --scenario help --scenario rtm-cancel --samples 50
+```
+
+Reports include raw samples, p50/p95 latency, first output, peak RSS, CPU time,
+output bytes and cancellation latency. CI runs a one-sample correctness check;
+timing thresholds are not imposed on shared runners. See
+[measurement methodology and baseline](docs/performance.md) before comparing runs.
+
 ### Live smoke
 
 `npm run test:live` builds the CLI and runs the opt-in live suite. All checks **skip** by default (exit 0):
