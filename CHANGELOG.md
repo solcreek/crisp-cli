@@ -17,6 +17,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Build and run the full offline suite once per verification, reusing coverage
+  data for RTM and release-tooling gates and the build for package smoke tests.
+- Verify the minimum supported Node.js 22.12.0 in CI alongside current Node 22 and 24.
 - Enforce Oxfmt formatting and Oxlint correctness checks in local verification,
   CI and the release gate, with pinned development dependencies and a separate
   formatting baseline recorded for Git blame.
