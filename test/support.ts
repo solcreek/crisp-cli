@@ -87,25 +87,28 @@ export async function withCrispMock(
   const pool = agent.get("https://api.crisp.chat")
   const calls: Captured[] = []
   for (const method of ["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD"]) {
-    pool.intercept({ path: () => true, method }).reply((opts: MockOpts) => {
-      const current = responses[Math.min(calls.length, responses.length - 1)] ?? responses[0]
-      calls.push({
-        method: String(opts.method ?? method),
-        path: String(opts.path ?? ""),
-        body: decodeBody(opts.body),
-        headers: headerMap(opts.headers),
-      })
-      return {
-        statusCode: current?.status ?? 500,
-        data: current?.json ?? {},
-        responseOptions: {
-          headers: {
-            "content-type": "application/json",
-            ...current?.headers,
+    pool
+      .intercept({ path: () => true, method })
+      .reply((opts: MockOpts) => {
+        const current = responses[Math.min(calls.length, responses.length - 1)] ?? responses[0]
+        calls.push({
+          method: String(opts.method ?? method),
+          path: String(opts.path ?? ""),
+          body: decodeBody(opts.body),
+          headers: headerMap(opts.headers),
+        })
+        return {
+          statusCode: current?.status ?? 500,
+          data: current?.json ?? {},
+          responseOptions: {
+            headers: {
+              "content-type": "application/json",
+              ...current?.headers,
+            },
           },
-        },
-      }
-    }).persist()
+        }
+      })
+      .persist()
   }
   try {
     await fn(agent)
@@ -133,17 +136,16 @@ export function assertUrl(actual: string, expected: string): void {
   const actualQuery = [...actualUrl.searchParams.entries()]
   const expectedQuery = [...expectedUrl.searchParams.entries()]
   if (JSON.stringify(actualQuery) !== JSON.stringify(expectedQuery)) {
-    throw new Error(`query ${JSON.stringify(actualQuery)} !== ${JSON.stringify(expectedQuery)} (raw ${actual})`)
+    throw new Error(
+      `query ${JSON.stringify(actualQuery)} !== ${JSON.stringify(expectedQuery)} (raw ${actual})`,
+    )
   }
 }
 
 function decodeBody(body: unknown): unknown {
   if (body === undefined || body === null || body === "") return null
-  const text = typeof body === "string"
-    ? body
-    : Buffer.isBuffer(body)
-      ? body.toString("utf8")
-      : String(body)
+  const text =
+    typeof body === "string" ? body : Buffer.isBuffer(body) ? body.toString("utf8") : String(body)
   if (!text) return null
   try {
     return JSON.parse(text) as unknown
@@ -155,7 +157,11 @@ function decodeBody(body: unknown): unknown {
 function headerMap(headers: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   if (!headers) return out
-  if (typeof headers === "object" && headers && typeof (headers as { get?: unknown }).get === "function") {
+  if (
+    typeof headers === "object" &&
+    headers &&
+    typeof (headers as { get?: unknown }).get === "function"
+  ) {
     const iterable = headers as { forEach: (fn: (value: string, key: string) => void) => void }
     iterable.forEach((value, key) => {
       out[key.toLowerCase()] = value

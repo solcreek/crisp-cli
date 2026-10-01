@@ -10,13 +10,27 @@ import { credentialEnv, FIXTURE, okEnvelope, removeHome, withCrispMock } from ".
 
 function capture() {
   let text = ""
-  return { stream: new Writable({ write(chunk, _encoding, callback) { text += chunk; callback() } }), text: () => text }
+  return {
+    stream: new Writable({
+      write(chunk, _encoding, callback) {
+        text += chunk
+        callback()
+      },
+    }),
+    text: () => text,
+  }
 }
 
 test("sink waits for each write, preserves UTF-8 order and flushes all waiters", async () => {
   const chunks: string[] = []
   const callbacks: (() => void)[] = []
-  const stream = new Writable({ highWaterMark: 1, write(chunk, _encoding, callback) { chunks.push(chunk.toString()); callbacks.push(callback) } })
+  const stream = new Writable({
+    highWaterMark: 1,
+    write(chunk, _encoding, callback) {
+      chunks.push(chunk.toString())
+      callbacks.push(callback)
+    },
+  })
   const sink = new OutputSink(stream, () => assert.fail("must not stop"), "stdout")
   sink.write("一\n")
   sink.write("two\n")
@@ -53,7 +67,12 @@ test("sink bounds queued plus in-flight bytes and stops once on overflow", async
 test("sink catches asynchronous stream failures without forwarding later chunks", async () => {
   let stopped = 0
   let calls = 0
-  const stream = new Writable({ write(_chunk, _encoding, callback) { calls++; queueMicrotask(() => callback(Object.assign(new Error("disk full"), { code: "ENOSPC" }))) } })
+  const stream = new Writable({
+    write(_chunk, _encoding, callback) {
+      calls++
+      queueMicrotask(() => callback(Object.assign(new Error("disk full"), { code: "ENOSPC" })))
+    },
+  })
   const sink = new OutputSink(stream, () => stopped++, "stdout")
   sink.write("first")
   sink.write("second")
@@ -65,9 +84,13 @@ test("sink catches asynchronous stream failures without forwarding later chunks"
 })
 
 test("process output drains and disposes its listeners", async () => {
-  const out = capture(), err = capture()
+  const out = capture(),
+    err = capture()
   const controller = new AbortController()
-  assert.equal(await runProcess(["--version"], out.stream, err.stream, { signal: controller.signal }), 0)
+  assert.equal(
+    await runProcess(["--version"], out.stream, err.stream, { signal: controller.signal }),
+    0,
+  )
   assert.match(out.text(), /^\d+\.\d+\.\d+\n$/)
   assert.equal(err.text(), "")
   assert.equal(out.stream.listenerCount("error"), 0)
@@ -76,9 +99,16 @@ test("process output drains and disposes its listeners", async () => {
 
 for (const code of ["EPIPE", "ENOSPC", "OUTPUT_SPOOFED"]) {
   test(`process handles stdout ${code} without disclosing stream error content`, async () => {
-    const out = new Writable({ write(_chunk, _encoding, callback) { callback(Object.assign(new Error("secret payload"), { code })) } })
+    const out = new Writable({
+      write(_chunk, _encoding, callback) {
+        callback(Object.assign(new Error("secret payload"), { code }))
+      },
+    })
     const err = capture()
-    assert.equal(await runProcess(["--version", "--json"], out, err.stream), code === "EPIPE" ? 0 : 1)
+    assert.equal(
+      await runProcess(["--version", "--json"], out, err.stream),
+      code === "EPIPE" ? 0 : 1,
+    )
     assert.doesNotMatch(err.text(), /secret payload/)
     if (code !== "EPIPE") assert.equal(JSON.parse(err.text()).message, "stdout write failed")
     else assert.equal(err.text(), "")
@@ -96,8 +126,14 @@ for (const mode of ["timeout", "abort", "already aborted", "close"] as const) {
     const flushed = sink.flush(controller.signal, 20)
     if (mode === "abort") controller.abort()
     if (mode === "close") stream.destroy()
-    await assert.rejects(flushed, { code: mode === "timeout" ? "OUTPUT_TIMEOUT"
-      : mode === "close" ? "OUTPUT_CLOSED" : "OUTPUT_CANCELLED" })
+    await assert.rejects(flushed, {
+      code:
+        mode === "timeout"
+          ? "OUTPUT_TIMEOUT"
+          : mode === "close"
+            ? "OUTPUT_CLOSED"
+            : "OUTPUT_CANCELLED",
+    })
     assert.equal(stopped, 1)
     assert.equal(stream.destroyed, true)
     await setImmediate()
@@ -111,7 +147,10 @@ test("process bounds stdout drain and reports the failure without leaking listen
   const out = new Writable({ write() {} })
   const err = capture()
   const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
-  assert.equal(await runProcess(["--version", "--json"], out, err.stream, { drainTimeoutMs: 20 }), 1)
+  assert.equal(
+    await runProcess(["--version", "--json"], out, err.stream, { drainTimeoutMs: 20 }),
+    1,
+  )
   assert.match(JSON.parse(err.text()).message, /stdout output drain timed out/)
   assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before)
 })
@@ -125,21 +164,38 @@ test("process bounds stderr drain and preserves usage exit status", async () => 
 
 test("process cancellation during output drain reports truncated output", async () => {
   const controller = new AbortController()
-  const out = new Writable({ write() { queueMicrotask(() => controller.abort()) } })
+  const out = new Writable({
+    write() {
+      queueMicrotask(() => controller.abort())
+    },
+  })
   const err = capture()
-  assert.equal(await runProcess(["--version", "--json"], out, err.stream, { signal: controller.signal }), 1)
+  assert.equal(
+    await runProcess(["--version", "--json"], out, err.stream, { signal: controller.signal }),
+    1,
+  )
   assert.match(JSON.parse(err.text()).message, /output drain cancelled/)
 })
 
 test("process accepts an already aborted signal when stdout is empty", async () => {
-  const out = capture(), err = capture()
-  assert.equal(await runProcess(["unknown", "--json"], out.stream, err.stream, { signal: AbortSignal.abort() }), 2)
+  const out = capture(),
+    err = capture()
+  assert.equal(
+    await runProcess(["unknown", "--json"], out.stream, err.stream, {
+      signal: AbortSignal.abort(),
+    }),
+    2,
+  )
   assert.equal(JSON.parse(err.text()).error, "usage")
 })
 
 test("process preserves usage failure when stderr is unavailable", async () => {
   const out = capture()
-  const err = new Writable({ write(_chunk, _encoding, callback) { callback(new Error("stderr failed")) } })
+  const err = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback(new Error("stderr failed"))
+    },
+  })
   assert.equal(await runProcess(["unknown", "--json"], out.stream, err), 2)
 })
 
@@ -147,22 +203,44 @@ test("a delayed EPIPE preserves an earlier fatal RTM error", async () => {
   const env = credentialEnv()
   const err = capture()
   let failWrite!: (error: Error) => void
-  const out = new Writable({ write(_chunk, _encoding, callback) { failWrite = callback } })
+  const out = new Writable({
+    write(_chunk, _encoding, callback) {
+      failWrite = callback
+    },
+  })
   try {
-    await withCrispMock({ status: 200, json: okEnvelope({ socket: { app: "wss://fixture.invalid/rtm/" } }) }, async dispatcher => {
-      const socket = new EventEmitter() as EventEmitter & { connect(): unknown; disconnect(): unknown }
-      socket.connect = () => { queueMicrotask(() => socket.emit("connect")); return socket }
-      socket.disconnect = () => socket
-      socket.on("authentication", () => {
-        socket.emit("authenticated")
-        socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "fixture" })
-        socket.emit("unauthorized")
-        setImmediate().then(() => failWrite(Object.assign(new Error("pipe closed"), { code: "EPIPE" })))
-      })
-      assert.equal(await runProcess(["listen", "--json"], out, err.stream, {
-        env, dispatcher, socketFactory: () => socket as unknown as Socket,
-      }), 1)
-    })
+    await withCrispMock(
+      { status: 200, json: okEnvelope({ socket: { app: "wss://fixture.invalid/rtm/" } }) },
+      async (dispatcher) => {
+        const socket = new EventEmitter() as EventEmitter & {
+          connect(): unknown
+          disconnect(): unknown
+        }
+        socket.connect = () => {
+          queueMicrotask(() => socket.emit("connect"))
+          return socket
+        }
+        socket.disconnect = () => socket
+        socket.on("authentication", () => {
+          socket.emit("authenticated")
+          socket.emit("message:send", { website_id: FIXTURE.websiteId, content: "fixture" })
+          socket.emit("unauthorized")
+          setImmediate().then(() =>
+            failWrite(Object.assign(new Error("pipe closed"), { code: "EPIPE" })),
+          )
+        })
+        assert.equal(
+          await runProcess(["listen", "--json"], out, err.stream, {
+            env,
+            dispatcher,
+            socketFactory: () => socket as unknown as Socket,
+          }),
+          1,
+        )
+      },
+    )
     assert.match(err.text(), /unauthorized/)
-  } finally { removeHome(env) }
+  } finally {
+    removeHome(env)
+  }
 })

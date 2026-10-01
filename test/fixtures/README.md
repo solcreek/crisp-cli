@@ -26,6 +26,7 @@ separate user and website tiers. The malformed session:sync:pages sample timesta
 does not affect the captured top-level routing fields. Synthetic test payloads
 are built in test/rtm-reference.ts; no customer data or document sample secrets
 are copied. The optional check:rtm-reference script detects event/tier/scope drift.
+
 # Independent payload examples
 
 `rtm-payloads.json` is hand-authored synthetic data, independent of the event

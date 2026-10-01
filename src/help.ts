@@ -1,7 +1,9 @@
 export const usage = {
-  authSet: "crispctl auth set [--profile <name>] --identifier <id> --key <key> --tier <website|plugin> --website <website_id>",
+  authSet:
+    "crispctl auth set [--profile <name>] --identifier <id> --key <key> --tier <website|plugin> --website <website_id>",
   conversationsGet: "crispctl conversations get <session>",
-  conversationsSearch: "crispctl conversations search <query> [--page <n>] [--search-type text|segment]",
+  conversationsSearch:
+    "crispctl conversations search <query> [--page <n>] [--search-type text|segment]",
   messagesList: "crispctl messages list <session>",
   reply: "crispctl reply <session> (--text <message> | --note <note>)",
   resolve: "crispctl resolve <session>",
@@ -10,7 +12,8 @@ export const usage = {
   segments: "crispctl segments <session> --set <a,b>",
   read: "crispctl read <session>",
   peopleGet: "crispctl people get <id|email>",
-  listen: "crispctl listen [--list-events] [--events <a,b>] [--session <id>] [--count <n>] [--timeout <seconds>]",
+  listen:
+    "crispctl listen [--list-events] [--events <a,b>] [--session <id>] [--count <n>] [--timeout <seconds>]",
 } as const
 
 export const ROOT_NOTES = `Profiles:

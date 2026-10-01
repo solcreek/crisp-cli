@@ -58,7 +58,9 @@ export function writeErr(
     stderr(`error: ${payload.message}\n`)
     return
   }
-  const head = [payload.status, payload.reason || payload.error].filter((part) => part !== undefined && part !== "").join(" ")
+  const head = [payload.status, payload.reason || payload.error]
+    .filter((part) => part !== undefined && part !== "")
+    .join(" ")
   if (payload.message && payload.message !== payload.reason && payload.message !== payload.error) {
     stderr(`error: ${head}: ${payload.message}\n`)
     return

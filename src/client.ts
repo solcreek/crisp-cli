@@ -28,7 +28,8 @@ export class CrispClient {
   ) {}
 
   getConnectEndpoints(signal?: AbortSignal): Promise<unknown> {
-    const path = this.creds.tier === "website" ? this.site("/connect/endpoints") : "/plugin/connect/endpoints"
+    const path =
+      this.creds.tier === "website" ? this.site("/connect/endpoints") : "/plugin/connect/endpoints"
     return this.request("GET", path, { signal })
   }
 
@@ -54,28 +55,40 @@ export class CrispClient {
   }
 
   sendOperatorMessage(sessionId: string, kind: "text" | "note", content: string): Promise<unknown> {
-    return this.request("POST", this.site(`/conversation/${encodeURIComponent(sessionId)}/message`), {
-      body: {
-        type: kind,
-        from: "operator",
-        origin: "chat",
-        content,
+    return this.request(
+      "POST",
+      this.site(`/conversation/${encodeURIComponent(sessionId)}/message`),
+      {
+        body: {
+          type: kind,
+          from: "operator",
+          origin: "chat",
+          content,
+        },
       },
-    })
+    )
   }
 
   setState(sessionId: string, state: "resolved" | "unresolved"): Promise<unknown> {
-    return this.request("PATCH", this.site(`/conversation/${encodeURIComponent(sessionId)}/state`), {
-      body: { state },
-    })
+    return this.request(
+      "PATCH",
+      this.site(`/conversation/${encodeURIComponent(sessionId)}/state`),
+      {
+        body: { state },
+      },
+    )
   }
 
   assign(sessionId: string, userId: string | null): Promise<unknown> {
-    return this.request("PATCH", this.site(`/conversation/${encodeURIComponent(sessionId)}/routing`), {
-      body: {
-        assigned: userId === null ? null : { user_id: userId },
+    return this.request(
+      "PATCH",
+      this.site(`/conversation/${encodeURIComponent(sessionId)}/routing`),
+      {
+        body: {
+          assigned: userId === null ? null : { user_id: userId },
+        },
       },
-    })
+    )
   }
 
   setSegments(sessionId: string, segments: string[]): Promise<unknown> {
@@ -124,7 +137,11 @@ export class CrispClient {
     return `/website/${encodeURIComponent(this.creds.websiteId)}${suffix}`
   }
 
-  private async request(method: string, path: string, opts?: { query?: Query; body?: unknown; signal?: AbortSignal }): Promise<unknown> {
+  private async request(
+    method: string,
+    path: string,
+    opts?: { query?: Query; body?: unknown; signal?: AbortSignal },
+  ): Promise<unknown> {
     if (this.readOnly && method !== "GET" && method !== "HEAD") {
       throw new UsageError("read-only mode: write operations are disabled")
     }
@@ -156,13 +173,19 @@ export class CrispClient {
         body,
         redirect: "error",
         dispatcher: this.dispatcher,
-        signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
+        signal: opts?.signal
+          ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)])
+          : AbortSignal.timeout(20_000),
       })
       text = await response.text()
     } catch (err) {
       if (response && response.status >= 400) {
-        throw new CrispApiError(response.status, statusReason(response.status), `HTTP ${response.status}`,
-          response.headers.get("retry-after") ?? undefined)
+        throw new CrispApiError(
+          response.status,
+          statusReason(response.status),
+          `HTTP ${response.status}`,
+          response.headers.get("retry-after") ?? undefined,
+        )
       }
       const message = err instanceof Error ? err.message : "request failed"
       throw new CrispApiError(0, "network_error", message)
@@ -176,20 +199,36 @@ export class CrispClient {
         decoded = JSON.parse(text)
       } catch {
         if (response.status >= 400) {
-          throw new CrispApiError(response.status, statusReason(response.status), `HTTP ${response.status}`, retryAfter)
+          throw new CrispApiError(
+            response.status,
+            statusReason(response.status),
+            `HTTP ${response.status}`,
+            retryAfter,
+          )
         }
-        throw new CrispApiError(response.status, "invalid_json", "response was not JSON", retryAfter)
+        throw new CrispApiError(
+          response.status,
+          "invalid_json",
+          "response was not JSON",
+          retryAfter,
+        )
       }
       if (!isEnvelope(decoded)) {
-        throw new CrispApiError(response.status, "invalid_json", "response was not a JSON object", retryAfter)
+        throw new CrispApiError(
+          response.status,
+          "invalid_json",
+          "response was not a JSON object",
+          retryAfter,
+        )
       }
       payload = decoded
     }
 
     if (response.status >= 400 || payload?.error === true) {
-      const reason = typeof payload?.reason === "string" && payload.reason
-        ? payload.reason
-        : statusReason(response.status)
+      const reason =
+        typeof payload?.reason === "string" && payload.reason
+          ? payload.reason
+          : statusReason(response.status)
       const dataMessage = readDataMessage(payload?.data)
       throw new CrispApiError(response.status, reason, dataMessage || reason, retryAfter)
     }

@@ -142,12 +142,15 @@ for (const verb of verbs) {
     const io = buffers()
     const payload = verb.name === "operators list" ? [{ user_id: "op-1" }] : { session_id: session }
     try {
-      const calls = await withCrispMock({ status: 200, json: okEnvelope(payload) }, async (dispatcher) => {
-        const code = await run(["--json", ...verb.argv], { ...io, env, dispatcher })
-        assert.equal(code, 0)
-        assert.equal(io.err(), "")
-        assert.deepEqual(JSON.parse(io.out()), payload)
-      })
+      const calls = await withCrispMock(
+        { status: 200, json: okEnvelope(payload) },
+        async (dispatcher) => {
+          const code = await run(["--json", ...verb.argv], { ...io, env, dispatcher })
+          assert.equal(code, 0)
+          assert.equal(io.err(), "")
+          assert.deepEqual(JSON.parse(io.out()), payload)
+        },
+      )
       assert.equal(calls.length, 1)
       const call = calls[0]
       assert.ok(call)
@@ -176,30 +179,33 @@ for (const verb of verbs) {
       const reason = status === 429 ? "rate_limited" : "invalid_data"
       const message = status === 429 ? `slow down ${FIXTURE.key}` : "bad session"
       try {
-        await withCrispMock({
-          status,
-          json: { error: true, reason, data: { message } },
-          headers: status === 429 ? { "retry-after": "3" } : {},
-        }, async (dispatcher) => {
-          const code = await run(["--json", ...verb.argv], { ...io, env, dispatcher })
-          assert.equal(code, 1)
-          assert.equal(io.out(), "")
-          const body = JSON.parse(io.err()) as {
-            ok: false
-            status: number
-            reason: string
-            message: string
-            retry_after?: string
-          }
-          assert.equal(body.ok, false)
-          assert.equal(body.status, status)
-          assert.equal(body.reason, reason)
-          assert.equal(body.message.includes(FIXTURE.key), false)
-          assert.match(body.message, status === 429 ? /\[redacted\]/ : /bad session/)
-          if (status === 429) {
-            assert.equal(body.retry_after, "3")
-          }
-        })
+        await withCrispMock(
+          {
+            status,
+            json: { error: true, reason, data: { message } },
+            headers: status === 429 ? { "retry-after": "3" } : {},
+          },
+          async (dispatcher) => {
+            const code = await run(["--json", ...verb.argv], { ...io, env, dispatcher })
+            assert.equal(code, 1)
+            assert.equal(io.out(), "")
+            const body = JSON.parse(io.err()) as {
+              ok: false
+              status: number
+              reason: string
+              message: string
+              retry_after?: string
+            }
+            assert.equal(body.ok, false)
+            assert.equal(body.status, status)
+            assert.equal(body.reason, reason)
+            assert.equal(body.message.includes(FIXTURE.key), false)
+            assert.match(body.message, status === 429 ? /\[redacted\]/ : /bad session/)
+            if (status === 429) {
+              assert.equal(body.retry_after, "3")
+            }
+          },
+        )
       } finally {
         removeHome(env)
       }
@@ -212,20 +218,24 @@ test("people get email searches then fetches the matching people_id", async () =
   const io = buffers()
   const profile = { people_id: "people_1", email: "ada@example.com" }
   try {
-    const calls = await withCrispMock([
-      {
-        status: 200,
-        json: okEnvelope([
-          { people_id: "other", email: "ada@example.com.extra" },
-          profile,
-        ]),
+    const calls = await withCrispMock(
+      [
+        {
+          status: 200,
+          json: okEnvelope([{ people_id: "other", email: "ada@example.com.extra" }, profile]),
+        },
+        { status: 200, json: okEnvelope(profile) },
+      ],
+      async (dispatcher) => {
+        const code = await run(["--json", "people", "get", "Ada@Example.com"], {
+          ...io,
+          env,
+          dispatcher,
+        })
+        assert.equal(code, 0)
+        assert.deepEqual(JSON.parse(io.out()), profile)
       },
-      { status: 200, json: okEnvelope(profile) },
-    ], async (dispatcher) => {
-      const code = await run(["--json", "people", "get", "Ada@Example.com"], { ...io, env, dispatcher })
-      assert.equal(code, 0)
-      assert.deepEqual(JSON.parse(io.out()), profile)
-    })
+    )
     assert.equal(calls.length, 2)
     assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=Ada@Example.com`)
     assertUrl(calls[1]?.path ?? "", `${site}/people/profile/people_1`)
@@ -242,17 +252,24 @@ for (const status of [400, 429]) {
     const io = buffers()
     const reason = status === 429 ? "rate_limited" : "invalid_data"
     try {
-      const calls = await withCrispMock({
-        status,
-        json: { error: true, reason, data: { message: "search failed" } },
-        headers: status === 429 ? { "retry-after": "3" } : {},
-      }, async (dispatcher) => {
-        const code = await run(["--json", "people", "get", "ada@example.com"], { ...io, env, dispatcher })
-        assert.equal(code, 1)
-        const body = JSON.parse(io.err()) as { status: number; reason: string }
-        assert.equal(body.status, status)
-        assert.equal(body.reason, reason)
-      })
+      const calls = await withCrispMock(
+        {
+          status,
+          json: { error: true, reason, data: { message: "search failed" } },
+          headers: status === 429 ? { "retry-after": "3" } : {},
+        },
+        async (dispatcher) => {
+          const code = await run(["--json", "people", "get", "ada@example.com"], {
+            ...io,
+            env,
+            dispatcher,
+          })
+          assert.equal(code, 1)
+          const body = JSON.parse(io.err()) as { status: number; reason: string }
+          assert.equal(body.status, status)
+          assert.equal(body.reason, reason)
+        },
+      )
       assert.equal(calls.length, 1)
       assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=ada@example.com`)
     } finally {
@@ -265,16 +282,23 @@ test("people get email with no exact match does not fetch a profile", async () =
   const env = credentialEnv()
   const io = buffers()
   try {
-    const calls = await withCrispMock({
-      status: 200,
-      json: okEnvelope([{ people_id: "other", email: "someone@example.com" }]),
-    }, async (dispatcher) => {
-      const code = await run(["--json", "people", "get", "ada@example.com"], { ...io, env, dispatcher })
-      assert.equal(code, 1)
-      const body = JSON.parse(io.err()) as { status: number; reason: string }
-      assert.equal(body.status, 404)
-      assert.equal(body.reason, "not_found")
-    })
+    const calls = await withCrispMock(
+      {
+        status: 200,
+        json: okEnvelope([{ people_id: "other", email: "someone@example.com" }]),
+      },
+      async (dispatcher) => {
+        const code = await run(["--json", "people", "get", "ada@example.com"], {
+          ...io,
+          env,
+          dispatcher,
+        })
+        assert.equal(code, 1)
+        const body = JSON.parse(io.err()) as { status: number; reason: string }
+        assert.equal(body.status, 404)
+        assert.equal(body.reason, "not_found")
+      },
+    )
     assert.equal(calls.length, 1)
     assertUrl(calls[0]?.path ?? "", `${site}/people/profiles/1?search_text=ada@example.com`)
   } finally {
@@ -293,7 +317,10 @@ test("search segment query and people id are encoded on the path", async () => {
       )
       assert.equal(code, 0)
     })
-    assertUrl(calls[0]?.path ?? "", `${site}/conversations/1?search_query=need+help&search_type=segment`)
+    assertUrl(
+      calls[0]?.path ?? "",
+      `${site}/conversations/1?search_query=need+help&search_type=segment`,
+    )
   } finally {
     removeHome(env)
   }
@@ -301,10 +328,17 @@ test("search segment query and people id are encoded on the path", async () => {
   const env2 = credentialEnv()
   const io2 = buffers()
   try {
-    const calls = await withCrispMock({ status: 200, json: okEnvelope({ people_id: "p1" }) }, async (dispatcher) => {
-      const code = await run(["people", "get", "people_1", "--json"], { ...io2, env: env2, dispatcher })
-      assert.equal(code, 0)
-    })
+    const calls = await withCrispMock(
+      { status: 200, json: okEnvelope({ people_id: "p1" }) },
+      async (dispatcher) => {
+        const code = await run(["people", "get", "people_1", "--json"], {
+          ...io2,
+          env: env2,
+          dispatcher,
+        })
+        assert.equal(code, 0)
+      },
+    )
     assertUrl(calls[0]?.path ?? "", `${site}/people/profile/people_1`)
   } finally {
     removeHome(env2)
@@ -317,7 +351,11 @@ test("--website overrides the env website id on the path", async () => {
   const io = buffers()
   try {
     const calls = await withCrispMock({ status: 200, json: okEnvelope([]) }, async (dispatcher) => {
-      const code = await run(["--website", override, "--json", "operators", "list"], { ...io, env, dispatcher })
+      const code = await run(["--website", override, "--json", "operators", "list"], {
+        ...io,
+        env,
+        dispatcher,
+      })
       assert.equal(code, 0)
     })
     assertUrl(calls[0]?.path ?? "", `/v1/website/${override}/operators/list`)
@@ -342,6 +380,8 @@ test("website tier is sent on X-Crisp-Tier", async () => {
 })
 
 test("package version matches the user agent source", () => {
-  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+    version: string
+  }
   assert.equal(version, pkg.version)
 })

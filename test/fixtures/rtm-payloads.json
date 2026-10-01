@@ -4,11 +4,15 @@
     "data": {
       "website_id": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc",
       "session_id": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881",
-      "type": "text", "origin": "chat", "from": "user",
-      "content": "你好\nsecond line \"quoted\" 😀", "timestamp": 1790856000000,
+      "type": "text",
+      "origin": "chat",
+      "from": "user",
+      "content": "你好\nsecond line \"quoted\" 😀",
+      "timestamp": 1790856000000,
       "fingerprint": 1790856000001,
       "user": { "nickname": "Fixture Visitor" },
-      "stamped": false, "inbox_id": null,
+      "stamped": false,
+      "inbox_id": null,
       "future": { "nested": [null, false, 0, "", { "未知": "preserve" }] }
     }
   },
@@ -17,34 +21,56 @@
     "data": {
       "website_id": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc",
       "session_id": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881",
-      "type": "file", "origin": "chat", "from": "operator",
-      "content": { "name": "範例.pdf", "url": "https://example.invalid/fixture.pdf", "type": "application/pdf" },
-      "timestamp": 1790856000002, "fingerprint": 1790856000003,
-      "user": { "nickname": "Fixture Operator", "user_id": "fixture-operator" }, "mentions": []
+      "type": "file",
+      "origin": "chat",
+      "from": "operator",
+      "content": {
+        "name": "範例.pdf",
+        "url": "https://example.invalid/fixture.pdf",
+        "type": "application/pdf"
+      },
+      "timestamp": 1790856000002,
+      "fingerprint": 1790856000003,
+      "user": { "nickname": "Fixture Operator", "user_id": "fixture-operator" },
+      "mentions": []
     }
   },
   {
     "event": "bucket:url:upload:generated",
     "data": {
-      "from": "operator", "id": "fixture-upload", "identifier": "opaque-not-a-website",
+      "from": "operator",
+      "id": "fixture-upload",
+      "identifier": "opaque-not-a-website",
       "resource": { "type": "website", "id": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc" },
-      "policy": "private", "type": "upload",
-      "url": { "resource": "https://example.invalid/upload", "signed": "https://example.invalid/upload?signature=fake&expires=0" }
+      "policy": "private",
+      "type": "upload",
+      "url": {
+        "resource": "https://example.invalid/upload",
+        "signed": "https://example.invalid/upload?signature=fake&expires=0"
+      }
     }
   },
   {
     "event": "email:track:view",
     "data": {
       "website_id": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc",
-      "type": "session", "identifier": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881", "mode": "open"
+      "type": "session",
+      "identifier": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881",
+      "mode": "open"
     }
   },
   {
     "event": "plugin:event",
     "data": {
       "website_id": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc",
-      "plugin_id": "fixture-plugin", "urn": "urn:fixture:event", "name": "fixture",
-      "data": { "session_id": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881", "items": [0, null, true, "保留"], "payload": { "website_id": "arbitrary-nested-value" } }
+      "plugin_id": "fixture-plugin",
+      "urn": "urn:fixture:event",
+      "name": "fixture",
+      "data": {
+        "session_id": "session_700c65e1-85e2-465a-b9ac-ecb5ec2c9881",
+        "items": [0, null, true, "保留"],
+        "payload": { "website_id": "arbitrary-nested-value" }
+      }
     }
   }
 ]

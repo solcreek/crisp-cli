@@ -4,7 +4,12 @@ export const OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024
 export const OUTPUT_DRAIN_TIMEOUT_MS = 5000
 
 export class OutputError extends Error {
-  constructor(readonly code: string, message: string) { super(message) }
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+  }
 }
 
 // One in-flight write: wait for its callback before submitting another chunk.
@@ -27,7 +32,8 @@ export class OutputSink {
   }
 
   private closed = (): void => {
-    if (this.active || this.queue.length) this.fail(this.outputError("OUTPUT_CLOSED", "closed before output drained"))
+    if (this.active || this.queue.length)
+      this.fail(this.outputError("OUTPUT_CLOSED", "closed before output drained"))
   }
 
   private outputError(code: string, message: string): Error {
@@ -48,7 +54,12 @@ export class OutputSink {
     if (this.failure) return
     const bytes = Buffer.byteLength(chunk)
     if (this.bytes + bytes > this.limit) {
-      this.fail(this.outputError("OUTPUT_OVERFLOW", `buffer exceeded ${this.limit} bytes; consumer is too slow`))
+      this.fail(
+        this.outputError(
+          "OUTPUT_OVERFLOW",
+          `buffer exceeded ${this.limit} bytes; consumer is too slow`,
+        ),
+      )
       return
     }
     this.bytes += bytes
@@ -59,9 +70,12 @@ export class OutputSink {
   private pump(): void {
     if (this.active || this.failure) return
     const chunk = this.queue.shift()
-    if (chunk === undefined) { this.wake(); return }
+    if (chunk === undefined) {
+      this.wake()
+      return
+    }
     this.active = true
-    this.stream.write(chunk, error => {
+    this.stream.write(chunk, (error) => {
       this.active = false
       if (error) this.fail(error)
       if (this.failure) return
@@ -77,11 +91,14 @@ export class OutputSink {
   async flush(signal?: AbortSignal, timeoutMs = OUTPUT_DRAIN_TIMEOUT_MS): Promise<void> {
     if (!this.failure && (this.active || this.queue.length)) {
       const abort = () => this.fail(this.outputError("OUTPUT_CANCELLED", "output drain cancelled"))
-      const timer = setTimeout(() => this.fail(this.outputError("OUTPUT_TIMEOUT", "output drain timed out")), timeoutMs)
+      const timer = setTimeout(
+        () => this.fail(this.outputError("OUTPUT_TIMEOUT", "output drain timed out")),
+        timeoutMs,
+      )
       signal?.addEventListener("abort", abort, { once: true })
       try {
         if (signal?.aborted) abort()
-        if (!this.failure) await new Promise<void>(resolve => this.waiters.push(resolve))
+        if (!this.failure) await new Promise<void>((resolve) => this.waiters.push(resolve))
       } finally {
         clearTimeout(timer)
         signal?.removeEventListener("abort", abort)
