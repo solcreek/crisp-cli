@@ -93,3 +93,59 @@ retain command correctness, redaction and cancellation tests when optimizing.
 For CLI scripting DX, usage-error latency, deterministic JSON, complete output and
 prompt cancellation are as relevant as help startup. Build and test-suite duration
 are separate developer workflows and are not included in these CLI timings.
+
+## Baseline: 2026-10-01
+
+CLI source: `ee9186f` (version 0.4.0), measured with the benchmark introduced in
+`36303a8`. No runtime optimization is included in this baseline. Both runs used
+macOS arm64 on an Apple M3, three warmups and 30 measured samples per scenario.
+Measurements used a working tree containing the new benchmark; runtime source
+matched the source revision above. Values below are milliseconds.
+
+| Scenario           | Node 24.21.0 p50 |    p95 | Node 22.12.0 p50 |    p95 |
+| ------------------ | ---------------: | -----: | ---------------: | -----: |
+| `node-baseline`    |            32.23 |  48.63 |            49.63 |  58.52 |
+| `version`          |            89.88 | 154.28 |           122.04 | 233.99 |
+| `help`             |            90.72 | 209.29 |           122.28 | 192.93 |
+| `nested-help`      |            90.52 | 202.28 |           125.20 | 237.29 |
+| `usage-error`      |            92.11 | 171.68 |           121.95 | 218.78 |
+| `event-catalog`    |            91.40 | 209.62 |           126.67 | 204.63 |
+| `rest-small`       |            95.35 | 178.76 |           124.31 | 171.11 |
+| `rest-large`       |           104.90 | 183.98 |           135.16 | 331.59 |
+| `rest-slow-reader` |           188.10 | 256.46 |           231.14 | 373.40 |
+| `rtm-first-event`  |           110.35 | 178.28 |           152.54 | 253.44 |
+| `rtm-burst`        |           130.56 | 233.68 |           186.96 | 300.36 |
+| `rtm-cancel`       |           110.35 | 243.35 |           151.55 | 209.56 |
+
+For `rtm-cancel`, the table above includes startup and delivery of the first event.
+The signal-to-close latency alone was:
+
+| Runtime  | Cancellation p50 |     p95 |
+| -------- | ---------------: | ------: |
+| v24.21.0 |          3.75 ms | 8.53 ms |
+| v22.12.0 |          3.61 ms | 6.05 ms |
+
+Both slow-reader runs scheduled exactly 85 ms of pauses for the same 1,123,244
+output bytes. Pausing per pipe chunk instead would distort comparisons because
+chunk sizes vary between Node versions, so the benchmark normalizes pauses to
+64 KiB of consumed data.
+
+On Node 24, p50 peak child RSS was about 73 MiB for help, 90 MiB for the large
+REST response and 94 MiB for the RTM burst. This measures process peaks, not
+retained memory after a long-running stream.
+
+The same machine completed one full `npm run verify` on Node 24 in 28.20 seconds:
+formatting, lint, type checking, build, 592 tests, three coverage gates and installed
+package smoke. This single developer-loop observation includes coverage and npm
+installation/cache effects; it is not a p95 or an offline CLI sample.
+
+The first optimization candidate is startup dependency loading. Source inspection
+shows that the command tree eagerly imports operations, which in turn load Undici
+and Socket.IO even for help/version. Help and small synthetic REST calls have
+similar elapsed times, consistent with startup being a substantial shared cost.
+An isolated lazy-loading change should be compared with this baseline before
+claiming a speedup; do not infer exact import costs by subtracting medians.
+
+Tail latency varied noticeably between runs on this development machine. Treat
+these numbers as an initial reference, not a cross-machine SLA or evidence that
+one Node version is always faster. No live Crisp performance was measured.
