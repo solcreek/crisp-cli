@@ -32,6 +32,14 @@ childProcess.execFileSync = (command, args, options) => {
   if (mode === "bin-failure") throw new Error("private executable output")
   if (args[0] === "--version") return mode === "wrong-version" ? "9.9.9\n" : `${version}\n`
   if (args[0] === "--help") return "listen\n"
+  if (args[0] === "serve")
+    return (
+      JSON.stringify({
+        protocol: mode === "wrong-worker-protocol" ? 2 : 1,
+        type: "ready",
+        capabilities: { read_only: true },
+      }) + '\n{"protocol":1,"type":"bye"}\n'
+    )
   if (args[0] === "reply")
     return mode === "missing-option" ? "--text\n" : "--text --note --json --read-only\n"
   if (args[0] === "conversations")
