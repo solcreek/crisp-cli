@@ -36,6 +36,13 @@ Development: use a dedicated test website. Production access requires explicit a
 `
 
 export const COMMAND_NOTES = {
+  serve: `Version 1 NDJSON request/response transport for finite REST commands.
+Requires --stdio. Starts with a ready frame describing capabilities and limits.
+Use --read-only to lock out writes for the entire worker lifetime.
+RTM subscriptions and local credential mutations are not supported by this transport.
+EOF, SIGINT and SIGTERM abort pending work and drain output within a bounded deadline.
+No automatic replay after cancellation or worker restart. See docs/stdio.md.
+`,
   "auth set": `Writes the selected profile and makes it current. Flags win, then CRISPCTL_* / CRISP_* env, then the existing profile.
 --website and --website-id both set website_id. Tier is website or plugin.
 `,

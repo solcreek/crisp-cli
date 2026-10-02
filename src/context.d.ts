@@ -15,4 +15,5 @@ export type IO = {
   signal?: AbortSignal
   socketFactory?: SocketFactory
   flags: Flags
+  serve?: (flags: Flags) => Promise<number>
 }

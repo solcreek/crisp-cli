@@ -8,6 +8,7 @@ export type Flags = {
   listEvents: boolean
   readOnly: boolean
   unassign: boolean
+  stdio?: boolean
   profile?: string
   website?: string
   websiteId?: string

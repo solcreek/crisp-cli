@@ -19,6 +19,15 @@ function operation(name: keyof typeof import("./operations.js")): CommandDefinit
   }
 }
 const DEFINITIONS: Readonly<Record<CommandPath, CommandDefinition>> = {
+  serve: {
+    description: "Run a persistent REST worker",
+    options: ["stdio"],
+    run: async (io) => {
+      if (!io.flags.stdio) throw new UsageError("usage: crispctl serve --stdio [--read-only]")
+      if (!io.serve) throw new UsageError("serve requires process-owned stdin and stdout")
+      return io.serve(io.flags)
+    },
+  },
   "auth set": {
     description: "Save a credential profile",
     options: ["identifier", "key", "tier"],
