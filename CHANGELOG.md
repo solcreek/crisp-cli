@@ -37,6 +37,11 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   help, configuration and validation startup costs while preserving cancellation
   across asynchronous module loading.
 
+### Fixed
+
+- Avoid a repeated `error:` prefix in plain-text diagnostics such as stdout drain
+  timeouts, preserving the existing JSON error format.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added

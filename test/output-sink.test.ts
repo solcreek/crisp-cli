@@ -166,17 +166,28 @@ for (const mode of ["timeout", "abort", "already aborted", "close"] as const) {
   })
 }
 
-test("process bounds stdout drain and reports the failure without leaking listeners", async () => {
-  const out = new Writable({ write() {} })
-  const err = capture()
-  const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
-  assert.equal(
-    await runProcess(["--version", "--json"], out, err.stream, { drainTimeoutMs: 20 }),
-    1,
-  )
-  assert.match(JSON.parse(err.text()).message, /stdout output drain timed out/)
-  assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before)
-})
+for (const json of [false, true]) {
+  test(`process bounds stdout drain with one diagnostic prefix (json=${json})`, async () => {
+    const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
+    const out = new Writable({ write() {} })
+    const err = capture()
+    assert.equal(
+      await runProcess(["--version", ...(json ? ["--json"] : [])], out, err.stream, {
+        drainTimeoutMs: 20,
+      }),
+      1,
+    )
+    if (json)
+      assert.deepEqual(JSON.parse(err.text()), {
+        ok: false,
+        error: "error",
+        message: "stdout output drain timed out",
+      })
+    else assert.equal(err.text(), "error: stdout output drain timed out\n")
+    assert.equal(out.listenerCount("error"), 0)
+    assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], before)
+  })
+}
 
 test("process bounds stderr drain and preserves usage exit status", async () => {
   const out = capture()
