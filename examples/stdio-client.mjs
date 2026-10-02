@@ -192,7 +192,9 @@ export async function connectWorker({
 export async function demo() {
   const directory = mkdtempSync(join(tmpdir(), "crispctl-example-"))
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => ["PATH", "SystemRoot", "WINDIR"].includes(key)),
+    Object.entries(process.env).filter(([key]) =>
+      ["PATH", "SYSTEMROOT", "WINDIR"].includes(key.toUpperCase()),
+    ),
   )
   env.CRISPCTL_CONFIG = join(directory, "empty-config.json")
   const controller = new AbortController()

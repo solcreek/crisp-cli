@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import test from "node:test"
 import { connectWorker } from "../examples/stdio-client.mjs"
 
@@ -40,6 +40,50 @@ test("standalone example ignores user config/credentials and logs only its summa
     },
     timeout: 10000,
   })
+  assert.equal(stderr, "")
+  assert.deepEqual(JSON.parse(stdout), { protocol: 1, read_only: true, responses: 2, closed: true })
+})
+
+test("demo preserves mixed-case platform variables while isolating the worker environment", async () => {
+  const probe = `
+    import assert from 'node:assert/strict';
+    import childProcess from 'node:child_process';
+    import { syncBuiltinESMExports } from 'node:module';
+    const originalSpawn = childProcess.spawn;
+    let spawns = 0;
+    childProcess.spawn = (command, args, options) => {
+      spawns++;
+      assert.equal(command, 'node');
+      assert.equal(options.env.Path, 'fixture-search-path');
+      assert.equal(options.env.systemroot, 'fixture-system-root');
+      assert.equal(options.env.Windir, 'fixture-windows-directory');
+      assert.equal(options.env.CRISPCTL_READ_ONLY, '1');
+      assert.notEqual(options.env.CRISPCTL_CONFIG, process.env.CRISPCTL_CONFIG);
+      assert.deepEqual(Object.keys(options.env).sort(),
+        ['Path', 'systemroot', 'Windir', 'CRISPCTL_CONFIG', 'CRISPCTL_READ_ONLY'].sort());
+      // Use an absolute executable so POSIX can verify the Windows-style environment.
+      return originalSpawn(process.execPath, args, options);
+    };
+    syncBuiltinESMExports();
+    const { demo } = await import(${JSON.stringify(pathToFileURL(example).href)});
+    await demo();
+    assert.equal(spawns, 1);
+  `
+  const { stdout, stderr } = await promisify(execFile)(
+    process.execPath,
+    ["--input-type=module", "-e", probe],
+    {
+      env: {
+        Path: "fixture-search-path",
+        systemroot: "fixture-system-root",
+        Windir: "fixture-windows-directory",
+        CRISPCTL_KEY: "private-fixture-value",
+        CRISPCTL_CONFIG: "/invalid-user-config",
+        UNRELATED_VARIABLE: "excluded-fixture-value",
+      },
+      timeout: 10000,
+    },
+  )
   assert.equal(stderr, "")
   assert.deepEqual(JSON.parse(stdout), { protocol: 1, read_only: true, responses: 2, closed: true })
 })

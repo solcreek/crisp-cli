@@ -42,6 +42,8 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Preserve mixed-case platform environment variables such as Windows `Path` when
+  starting the stdio demo worker, while keeping credentials isolated.
 - Avoid a repeated `error:` prefix in plain-text diagnostics such as stdout drain
   timeouts, preserving the existing JSON error format.
 
