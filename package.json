@@ -14,6 +14,7 @@
     "CHANGELOG.md",
     "docs/rtm-coverage.md",
     "docs/performance.md",
+    "docs/stdio.md",
     "LICENSE"
   ],
   "engines": {
@@ -34,6 +35,7 @@
     "bench": "node scripts/build.mjs && node scripts/benchmark.mjs",
     "bench:stages": "node scripts/build.mjs && node scripts/benchmark-stages.mjs",
     "bench:soak": "node scripts/build.mjs && node --expose-gc scripts/benchmark-output-soak.mjs",
+    "bench:worker": "node scripts/build.mjs && node scripts/benchmark-worker.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json",
     "verify": "npm run fmt:check && npm run lint && npm run typecheck && npm test && npm run coverage:rtm && npm run coverage:tooling && node scripts/package-smoke.mjs",

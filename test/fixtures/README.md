@@ -42,3 +42,9 @@ matrix generator. It exercises text/file messages, bucket resources, email
 tracking and opaque plugin data over WSS, with optional and unknown fields,
 Unicode and nested JSON. Identifiers are test fixtures and URLs use
 `example.invalid`; these are not captured customer events or exhaustive schemas.
+
+`stdio-loopback-cli.mjs` invokes the real process CLI lifecycle with an injected
+Undici pool restricted to loopback HTTPS. The same public test certificate is
+explicitly trusted by this pool; certificate verification remains enabled. It
+supports REST worker E2E tests and cold/warm comparisons without sending data to
+Crisp. All fixture credentials and payloads are synthetic.

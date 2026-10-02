@@ -203,6 +203,20 @@ node scripts/rtm-smoke.mjs "<expected website name>"
 
 Set `CRISPCTL_LIVE_OP_ITEM` and optionally `CRISPCTL_LIVE_OP_VAULT` to select a different 1Password API-token item. By default, the script reads `Crisp API Credentials` (`API Identifier` / `token_identifier`, `API Key` / `token_key`, and `website_id`) using the real `op` CLI, verifies the website name via a GET request, and runs the built CLI with a website token and `--read-only --json --count 1 --timeout 60`. It only receives events; it never creates a test message or changes a conversation. It reports only assertion results and counts, without website names, event payloads, customer content or credentials. A parent watchdog terminates stalled children; malformed, oversized or truncated NDJSON fails the check. Credentials remain in memory and the child environment. A successful check requires an actual website event, not just authentication; a quiet website can time out.
 
+## Persistent REST worker
+
+Applications that repeatedly call REST commands can reuse a Node process and its
+HTTPS connections with `crispctl serve --stdio --read-only`. The versioned NDJSON
+protocol supports request IDs, bounded concurrency, per-request cancellation and
+process-level read-only enforcement. RTM continues to use `listen --json`.
+
+See [the stdio protocol](docs/stdio.md) for negotiation, limits, shutdown and retry
+semantics. Clients should negotiate capabilities and fall back to one-shot CLI
+for older/custom executables. Internal JavaScript imports are not a public API.
+
+Use `npm run bench:worker` for offline cold/warm comparisons. Worker startup and
+its first refresh are measured separately from repeated warm requests.
+
 ## Testing
 
 Unit and HTTP contract tests use undici [`MockAgent`](https://undici.nodejs.org/#/docs/api/MockAgent) against `https://api.crisp.chat`. Each MVP verb has a happy path plus HTTP 400 and 429. The mock is the client's dispatcher, so the test sees the real path, query, and body. Nothing in `npm test` contacts Crisp.

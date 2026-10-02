@@ -42,6 +42,21 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
     const run = (args) =>
       execFileSync(bin, args, { cwd: directory, env, encoding: "utf8", timeout: 10_000 })
     assert.equal(run(["--version"]).trim(), version)
+    const worker = execFileSync(bin, ["serve", "--stdio", "--read-only"], {
+      cwd: directory,
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+      input: '{"protocol":1,"type":"shutdown"}\n',
+    })
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    assert.equal(worker[0].protocol, 1)
+    assert.equal(worker[0].type, "ready")
+    assert.equal(worker[0].capabilities.read_only, true)
+    assert.equal(worker[1].type, "bye")
+    assert.equal(worker.length, 2)
     assert.match(run(["--help"]), /listen/)
     const replyHelp = run(["reply", "--help"])
     for (const flag of ["--text", "--note", "--json", "--read-only"])

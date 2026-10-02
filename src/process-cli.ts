@@ -1,4 +1,4 @@
-import type { Writable } from "node:stream"
+import type { Readable, Writable } from "node:stream"
 import { setImmediate } from "node:timers/promises"
 import { run, type RunOptions } from "./cli.js"
 import { OutputError, OutputSink } from "./output-sink.js"
@@ -10,7 +10,10 @@ export async function runProcess(
   argv: string[],
   stdout: Writable,
   stderr: Writable,
-  options: Omit<RunOptions, "stdout" | "stderr" | "lifecycle"> & { drainTimeoutMs?: number } = {},
+  options: Omit<RunOptions, "stdout" | "stderr" | "lifecycle" | "serve"> & {
+    drainTimeoutMs?: number
+    stdin?: Readable
+  } = {},
 ): Promise<number> {
   const lifecycle = new RunLifecycle(options.signal)
   const out = new OutputSink(stdout, lifecycle.cancel, "stdout")
@@ -23,6 +26,23 @@ export async function runProcess(
       stderr: err.write,
       lifecycle,
       signal: lifecycle.signal,
+      serve: async (flags) => {
+        const { serve } = await import("./stdio.js")
+        stdout.once("close", lifecycle.cancel)
+        try {
+          return await serve({
+            input: options.stdin ?? process.stdin,
+            write: out.write,
+            flush: () => out.flush(lifecycle.signal, options.drainTimeoutMs),
+            signal: lifecycle.signal,
+            env: options.env ?? process.env,
+            flags,
+            dispatcher: options.dispatcher,
+          })
+        } finally {
+          stdout.removeListener("close", lifecycle.cancel)
+        }
+      },
     })
     const deadlineReported = lifecycle.timedOut
     try {

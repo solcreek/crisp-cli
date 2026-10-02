@@ -10,6 +10,8 @@ import { version } from "./version.js"
 import type { RunLifecycle } from "./lifecycle.js"
 
 export type RunOptions = {
+  credentials?: InvocationCredentials
+  serve?: (flags: Flags) => Promise<number>
   lifecycle?: RunLifecycle
   stdout?: (chunk: string) => void
   stderr?: (chunk: string) => void
@@ -24,7 +26,7 @@ export async function run(argv: string[], options: RunOptions = {}): Promise<num
   const stderr = options.stderr ?? ((chunk: string) => process.stderr.write(chunk))
   const env = options.env ?? process.env
   const tree = createCommandTree()
-  const credentials = new InvocationCredentials(env, argv)
+  const credentials = options.credentials ?? new InvocationCredentials(env, argv)
   let flags: Flags | undefined
   try {
     const parsed = tree.prepare(argv)

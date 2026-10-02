@@ -21,6 +21,7 @@ export const OPTIONS = [
   ["--count <n>", "Stop after N matching events"],
   ["--timeout <seconds>", "Listen deadline including stdout drain"],
   ["--list-events", "List RTM events without connecting"],
+  ["--stdio", "Use the versioned NDJSON worker transport"],
 ] as const
 
 type LongOptionName<Spec extends string> = Spec extends `${string}--${infer Name} ${string}`

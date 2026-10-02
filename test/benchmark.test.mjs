@@ -236,3 +236,39 @@ test("benchmark filters scenarios and excludes warmups from raw samples", async 
     )
   }
 })
+
+test(
+  "worker benchmark validates paired HTTPS refreshes and warm connection reuse",
+  { timeout: 15000 },
+  async () => {
+    const script = fileURLToPath(new URL("../scripts/benchmark-worker.mjs", import.meta.url))
+    const { stdout, stderr } = await promisify(execFile)(
+      process.execPath,
+      [script, "--samples", "2"],
+      {
+        env: { PATH: process.env.PATH, CRISPCTL_KEY: "private-ignored-key" },
+        timeout: 12000,
+      },
+    )
+    assert.equal(stderr, "")
+    const report = JSON.parse(stdout)
+    assert.equal(report.mode, "loopback-https")
+    assert.equal(report.pairs.length, 2)
+    assert.ok(report.startupMs > 0)
+    assert.ok(report.firstRefresh.newConnections > 0)
+    for (const pair of report.pairs) {
+      assert.equal(pair.worker.newConnections, 0)
+      assert.equal(pair.oneShot.newConnections, 3)
+      assert.ok(pair.worker.ms > 0)
+    }
+    assert.doesNotMatch(stdout, /private-ignored-key|fixture-key|fixture-site|session_id/)
+    await assert.rejects(
+      promisify(execFile)(process.execPath, [script, "--live"], { env: {}, timeout: 3000 }),
+      (error) => {
+        assert.equal(error.stdout, "")
+        assert.equal(error.stderr, "worker benchmark failed during setup; no payloads recorded\n")
+        return true
+      },
+    )
+  },
+)
