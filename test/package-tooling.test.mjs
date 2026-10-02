@@ -45,6 +45,7 @@ for (const mode of [
   "bin-failure",
   "wrong-version",
   "wrong-worker-protocol",
+  "bad-example",
   "missing-option",
   "missing-pages-option",
   "pages-accepts-invalid",

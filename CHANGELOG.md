@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Ship a runnable, credential-free stdio client example with bounded handshake,
+  requests, cancellation and shutdown, plus error/fallback integration guidance.
+
 - Add a versioned `serve --stdio` REST worker with request IDs, bounded concurrency
   and output, cancellation/deadlines, shared connections and process-level read-only
   enforcement. Document negotiation, shutdown and no-replay semantics.

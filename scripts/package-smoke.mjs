@@ -27,6 +27,8 @@ try {
     "dist/rtm-events.js",
     "docs/rtm-coverage.md",
     "docs/performance.md",
+    "docs/stdio.md",
+    "examples/stdio-client.mjs",
     "CHANGELOG.md",
     "LICENSE",
   ]) {

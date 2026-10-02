@@ -214,6 +214,18 @@ See [the stdio protocol](docs/stdio.md) for negotiation, limits, shutdown and re
 semantics. Clients should negotiate capabilities and fall back to one-shot CLI
 for older/custom executables. Internal JavaScript imports are not a public API.
 
+Try the credential-free [client example](examples/stdio-client.mjs):
+
+```sh
+npm run build
+node examples/stdio-client.mjs
+```
+
+It sends two parallel local requests and waits for their responses before shutdown.
+Keep stdin open while requests are pending: EOF cancels outstanding work. See the
+[error and fallback table](docs/stdio.md#error-handling-and-fallback) for large
+read-only responses, cancellation, rate limits and older executables.
+
 Use `npm run bench:worker` for offline cold/warm comparisons. Worker startup and
 its first refresh are measured separately from repeated warm requests.
 

@@ -5,6 +5,87 @@ This amortizes Node/module startup and HTTPS connection setup over repeated read
 Use `listen --json` separately for RTM subscriptions. Do not import internal modules
 as a compatibility contract.
 
+## Run the client example
+
+From a checkout:
+
+```sh
+npm run build
+node examples/stdio-client.mjs
+# Or run the client with Bun; it still starts a Node worker:
+bun examples/stdio-client.mjs
+```
+
+From a local npm installation:
+
+```sh
+node node_modules/crispctl/examples/stdio-client.mjs
+```
+
+Expected output:
+
+```json
+{ "protocol": 1, "read_only": true, "responses": 2, "closed": true }
+```
+
+The [complete reference client](../examples/stdio-client.mjs) creates an empty
+temporary configuration, ignores inherited Crisp credentials, makes two parallel
+`auth show` requests, waits for their responses, then sends shutdown and reaps the
+child. It does not call Crisp or print profile values. `CRISPCTL_BIN` may point to
+one trusted executable (a path, not a shell command); otherwise the example runs
+the adjacent built CLI with `node` from PATH.
+
+**Keep stdin open until the responses you need arrive.** A command such as
+`echo '{...}' | crispctl serve --stdio` closes stdin immediately. Fast local
+commands can appear to work while slower REST requests are cancelled by EOF.
+Use the example's request/response lifecycle for persistent clients.
+
+The demonstration at the bottom of the file is short; the reusable part shows
+bounded frame decoding, a pending-ID map, capability checks, per-request deadlines,
+AbortSignal cancellation, and shutdown/kill cleanup. It caps submissions at four
+(or the worker's lower limit), rejects extra submissions locally, and continuously
+reads stdout. It has a handshake timeout and individual request watchdogs rather
+than a fixed maximum worker lifetime. It never retries or falls back automatically.
+
+For your application, copy/adapt the reference and supply the intended environment.
+Unlike the isolated demo, `connectWorker()` defaults to inheriting `process.env`:
+
+```js
+import { connectWorker } from "./stdio-client.mjs" // Your copy of the example
+
+const worker = await connectWorker({
+  command: "crispctl", // Or the full path to a trusted executable
+  args: [],
+  env: process.env,
+})
+try {
+  if (!worker.capabilities.commands.includes("conversations list")) {
+    throw new Error("Required worker capability is unavailable")
+  }
+  const controller = new AbortController()
+  const response = await worker.request(["conversations", "list", "--page", "1"], {
+    signal: controller.signal,
+    timeoutMs: 10_000,
+  })
+  // Consume response.result, or handle response.error using the table below.
+  // Call controller.abort() from your UI's cancellation callback when needed.
+} finally {
+  await worker.close()
+}
+```
+
+The example always forces read-only. Its JavaScript exports are reference code,
+not a supported SDK contract; the wire protocol is the compatibility boundary.
+Command errors, including cancellation and deadline responses, resolve to frames
+with `ok: false`. Local validation and already-aborted signals reject before sending.
+Transport/protocol failures reject pending promises and terminate the child;
+`close()` also reports such failures.
+Cancellation waits for a terminal worker response (which may race with success).
+A worker that misses the parent watchdog is killed, so other pending requests
+then also fail. Handle these outcomes in your adapter, coalesce refreshes and
+queue client work deliberately. The benchmark helper in `scripts/worker-client.mjs`
+is for finite measurements and should not be used as a permanent TUI client.
+
 ## Negotiation and fallback
 
 The worker first writes one JSON `ready` frame followed by a newline:
@@ -130,12 +211,65 @@ This is a local transport for a trusted parent process, not a network server or
 multi-tenant authorization boundary. Never put credentials or customer payloads in
 application logs. Maintain a continuously draining stdout reader.
 
+## Error handling and fallback
+
+`capabilities.commands` lists commands the protocol understands, including write
+commands. It is **not** a list of permitted operations: also check `read_only`.
+A locked worker rejects writes with the existing CLI `usage` category. Do not
+classify policy failures by matching localized or mutable message strings.
+The client should already know which of its own operations are reads or writes.
+
+| Outcome                                                                          | Worker usable? | Caller action                                                                                                                          |
+| -------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Handshake missing, incompatible, or missing a required capability                | No             | Terminate and reap the probe. Before dispatching an operation, choose one-shot mode for a trusted older/custom executable.             |
+| `usage` / `config`                                                               | Yes            | Correct arguments/configuration. For a known write with `read_only: true`, disable the action. Do not retry unchanged.                 |
+| `unsupported_command`                                                            | Yes            | Check capabilities. Use one-shot help/version/auth commands or the separate RTM listener deliberately.                                 |
+| `busy`                                                                           | Yes            | The operation was not executed. Queue/coalesce work locally; retry only under your own bounded scheduling policy.                      |
+| `cancelled` / `deadline_exceeded`                                                | Yes            | Discard stale UI work. Cancellation does not establish whether a dispatched write took effect.                                         |
+| `response_too_large`                                                             | Yes            | For a specifically known read, optionally use bounded one-shot JSON output. Never repeat a write on this basis.                        |
+| HTTP 429 with `retry_after`                                                      | Yes            | Respect the server's delay and the caller's remaining deadline; avoid a retry storm.                                                   |
+| Other HTTP/API errors                                                            | Yes            | Surface the status/reason appropriately. Changing transports generally does not fix these errors.                                      |
+| `network_error`, `request_failed`, broken pipe, unexpected exit, parent watchdog | Possibly not   | Surface failure; pending writes have unknown outcome. Never automatically replay them. A read retry must be an explicit caller policy. |
+| Protocol `error` frame                                                           | No             | Fix the adapter/framing problem and start a new worker; do not blindly resend pending operations.                                      |
+
+For `response_too_large`, the worker's 1 MiB encoded-response limit is smaller
+than the one-shot REST reader's 8 MiB decoded-body limit. A large read may work
+one-shot, but this is not guaranteed; JSON serialization/redaction can also change
+size. Use an explicit allowlist of read operations in your adapter. For example,
+`conversations list`, `conversations get`, `messages list` and `conversations pages`
+are reads; `reply`, `resolve`, `reopen`, `assign`, `segments` and `read` mutate state.
+The command named `read` marks a conversation read and **must not** be treated as
+a read-only query.
+
+A fallback should invoke the same trusted executable directly with argument arrays,
+`--read-only --json`, the same selected profile/website and environment, and a
+remaining deadline/output byte bound. Validate its exit code and JSON response,
+then reap it. Credentials/configuration may change between requests, and a second
+read can observe newer data. Do not use fallback to evade cancellation, rate limits
+or a write's unknown outcome. The reference client returns the error to its caller
+so this choice remains explicit.
+
+### Troubleshooting protocol errors
+
+Protocol diagnostics intentionally omit caller input and private values. Protocol 1
+uses broad error codes; more specific diagnostic fields are not currently promised.
+
+| Error                          | Check                                                                                                                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalid_frame`                | Valid UTF-8; one JSON object per line; no blank lines; `protocol: 1`; a supported `type`; correctly typed ID/argv/deadline; no unknown fields. Pretty-printed multi-line JSON is not a frame. |
+| `duplicate_id`                 | Use fresh IDs for every request. Do not reuse an ID while its response may still be draining.                                                                                                 |
+| `request_too_large`            | Keep each input frame within the advertised byte limit, including multi-byte UTF-8 characters.                                                                                                |
+| `truncated_frame`              | End each frame with LF before closing stdin.                                                                                                                                                  |
+| `input_error`                  | Check the parent pipe/lifecycle; a transport interruption is not a successful request.                                                                                                        |
+| `unsupported_command` response | `listen`, nested `serve`, `auth set`, help/version requests and unknown commands are not worker operations. Consult the handshake and use the corresponding one-shot command deliberately.    |
+
 ## Verification and measurement
 
 The offline suite covers concurrent results/errors, process-level read-only,
 queue limits, cancellations during bodies and queue waits, shutdown, malformed
 frames, redaction, output limits, real TLS connection reuse, forced worker death
-and restart without replay. Installed-package smoke checks the public handshake.
+and restart without replay. Installed-package smoke checks the public handshake
+and runs the packaged client example through shutdown.
 
 `npm run bench:worker` compares three parallel one-shot processes with three
 parallel requests to one worker. Fixtures use loopback HTTPS with certificate
