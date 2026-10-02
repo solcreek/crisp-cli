@@ -368,3 +368,17 @@ Pull requests and main pushes run `.github/workflows/ci.yml`, which calls the sa
 ## License
 
 MIT
+
+### Persistent REST worker
+
+Applications that repeatedly call REST commands can reuse a Node process and its
+HTTPS connections with `crispctl serve --stdio --read-only`. The versioned NDJSON
+protocol supports request IDs, bounded concurrency, per-request cancellation and
+process-level read-only enforcement. RTM continues to use `listen --json`.
+
+See [the stdio protocol](docs/stdio.md) for negotiation, limits, shutdown and retry
+semantics. Clients should negotiate capabilities and fall back to one-shot CLI
+for older/custom executables. Internal JavaScript imports are not a public API.
+
+Use `npm run bench:worker` for offline cold/warm comparisons. Worker startup and
+its first refresh are measured separately from repeated warm requests.

@@ -9,6 +9,12 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add a versioned `serve --stdio` REST worker with request IDs, bounded concurrency
+  and output, cancellation/deadlines, shared connections and process-level read-only
+  enforcement. Document negotiation, shutdown and no-replay semantics.
+- Compare cold/warm worker refreshes against one-shot CLI over verified loopback
+  HTTPS, with an explicitly opted-in read-only live benchmark.
+
 - Measure a reused output pipeline over 100,000 validated records with periodic
   GC memory samples using `npm run bench:soak`.
 

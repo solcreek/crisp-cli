@@ -296,3 +296,58 @@ These are single observed durations including validation and GC, not p50/p95.
 The retained heap stayed within roughly 0.1 MiB during this probe. That supports
 repeated output-queue reuse in this workload; it is not proof against all memory
 leaks and does not exercise a long-lived Socket.IO connection.
+
+## Persistent REST worker
+
+Compared the protocol-1 worker against the built `badbd4f` baseline (PR #19 merged)
+on the same Apple M3 macOS arm64 machine. Each refresh reads inbox, conversation
+and messages concurrently. Thirty pairs alternate one-shot/worker order. Every
+response is parsed and its shape validated. No other test suite ran concurrently.
+
+Both variants run the real process CLI lifecycle through a test entry injecting
+an Undici pool redirected to loopback HTTPS. Certificate verification remains on.
+The fixture adds 5 ms per request. This exercises real TCP/TLS reuse, but is not a
+measurement of live Crisp/WAN latency. The test entry's import overhead is included
+in both startup measurements. One-shot runs use the baseline implementation;
+the worker uses the new implementation. Values are milliseconds:
+
+| Runtime      | One-shot refresh p50 / p95 | Warm worker p50 / p95 | Worker startup | First worker refresh | Startup + first refresh |
+| ------------ | -------------------------: | --------------------: | -------------: | -------------------: | ----------------------: |
+| Node 24.21.0 |             92.32 / 106.68 |           8.01 / 8.48 |          78.69 |                26.46 |                  105.16 |
+| Node 22.12.0 |            133.46 / 151.99 |          8.27 / 14.16 |         113.96 |                49.46 |                  163.42 |
+
+Startup and first-refresh values are single observations, not percentiles. Each
+one-shot refresh opened three TLS connections. The worker opened three during its
+first refresh and **zero** during every measured warm refresh on both runtimes.
+The cold worker was slower than the one-shot median; the improvement applies to
+repeated use, not a promise of faster initial TUI startup.
+
+Reproduce with `npm run bench:worker` or
+`node scripts/benchmark-worker.mjs --baseline /path/to/built-checkout --samples 30`.
+The JSON report includes all pairs and observed connection counts. CI validates
+response contracts and connection reuse without asserting a timing threshold.
+
+### Read-only live comparison
+
+A separate authorized sandbox run used the public executable for both variants,
+real credentials supplied only through each child's environment, and a session
+selected in memory. Ten pairs alternated order, with 500 ms pacing outside each
+measurement. All responses were parsed and shape-checked; there were no writes
+or automatic retries. Only timing metadata was saved.
+
+| Runtime      | One-shot refresh p50 / p95 | Warm worker p50 / p95 | Worker startup | First worker refresh |
+| ------------ | -------------------------: | --------------------: | -------------: | -------------------: |
+| Node 24.21.0 |         580.89 / 643.49 ms |    252.51 / 258.75 ms |       67.38 ms |            538.64 ms |
+
+The warm median decreased by about 56.5% for this workload, and all ten paired
+warm refreshes were faster. Worker startup plus its first refresh took about
+606.03 ms, separately from the warm distribution. This is evidence for repeated
+reads in this environment, not a TUI startup prediction or a tail-latency SLA.
+With ten observations, the nearest-rank p95 is the maximum sample. Server caching
+and network conditions can affect both variants. Live TLS counts were not
+instrumented; connection-reuse assertions use the real loopback TLS tests above.
+
+An additional Node 22 live comparison was not completed; renewing local credential
+access timed out. Node 22 has offline HTTPS measurements and full verification,
+but no live timing claim is made for that runtime. The live benchmark remains
+opt-in as described in [the protocol documentation](stdio.md).
