@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { createServer } from "node:https"
 import { readFileSync } from "node:fs"
 import { once } from "node:events"
+import { setTimeout as delay } from "node:timers/promises"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
 import { startWorker } from "../scripts/worker-client.mjs"
@@ -73,14 +74,18 @@ test(
       )
       assert.equal((await w.request(["reply", "session", "--text", "synthetic"])).ok, true)
       assert.equal(writes, 1)
-      const pending = w.request(["messages", "list", "slow"])
+      // The server accepts this write but withholds the response. Killing the worker
+      // leaves an unknown outcome; restarting must not send the operation again.
+      const pending = w.request(["reply", "slow", "--text", "synthetic"])
       const rejected = assert.rejects(pending, /worker closed/)
+      for (let attempt = 0; writes < 2 && attempt < 100; attempt++) await delay(5)
+      assert.equal(writes, 2)
       w.child.kill("SIGKILL")
       await rejected
       await w.closed
       w = await startWorker([...args, "--read-only"], env)
       assert.equal((await w.request(commands[0])).ok, true)
-      assert.equal(writes, 1)
+      assert.equal(writes, 2)
       assert.equal((await w.stop()).code, 0)
     } finally {
       if (w) {
