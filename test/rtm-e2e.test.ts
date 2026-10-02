@@ -104,12 +104,15 @@ for (const mode of [
       child.stdout!.pause()
       // Observe process exit without draining its pipe; 'close' may await reader EOF.
       const exit = once(child, "exit")
-      if (mode === "count signal") {
-        await once(child.stdout!, "readable")
-        child.kill("SIGTERM")
-      }
+      // Removing the last 'readable' listener can resume an existing 'data' listener.
+      const keepPaused = () => {}
       let timer: ReturnType<typeof setTimeout> | undefined
       try {
+        if (mode === "count signal") {
+          child.stdout!.on("readable", keepPaused)
+          await once(child.stdout!, "readable")
+          child.kill("SIGTERM")
+        }
         const result = await Promise.race([
           exit,
           new Promise<null>((resolve) => {
@@ -118,6 +121,7 @@ for (const mode of [
         ])
         assert.ok(result, "process must exit even while the stdout reader remains stalled")
         assert.equal(result[0], 1)
+        child.stdout!.removeListener("readable", keepPaused)
         child.stdout!.resume()
         assert.match(
           (await completed).stderr,
@@ -129,6 +133,7 @@ for (const mode of [
         )
       } finally {
         clearTimeout(timer)
+        child.stdout!.removeListener("readable", keepPaused)
       }
     },
   )
