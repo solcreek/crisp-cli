@@ -61,7 +61,7 @@ export function writeErr(
     stderr(`${JSON.stringify(payload)}\n`)
     return
   }
-  if ((payload.error === "usage" || payload.error === "config") && payload.status === undefined) {
+  if (payload.status === undefined) {
     stderr(`error: ${payload.message}\n`)
     return
   }

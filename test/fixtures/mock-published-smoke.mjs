@@ -28,6 +28,15 @@ childProcess.execFileSync = (command, args, options) => {
     if (mode === "install-failure") throw new Error("private npm output")
     return ""
   }
+  if (command === process.execPath) {
+    assert.equal(args[0], join(directory, "node_modules/crispctl/examples/stdio-client.mjs"))
+    return JSON.stringify({
+      protocol: 1,
+      read_only: true,
+      responses: 2,
+      closed: mode !== "bad-example",
+    })
+  }
   assert.equal(command, join(directory, "node_modules/.bin/crispctl"))
   if (mode === "bin-failure") throw new Error("private executable output")
   if (args[0] === "--version") return mode === "wrong-version" ? "9.9.9\n" : `${version}\n`

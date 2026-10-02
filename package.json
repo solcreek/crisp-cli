@@ -15,6 +15,7 @@
     "docs/rtm-coverage.md",
     "docs/performance.md",
     "docs/stdio.md",
+    "examples/stdio-client.mjs",
     "LICENSE"
   ],
   "engines": {

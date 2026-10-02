@@ -9,6 +9,9 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Ship a runnable, credential-free stdio client example with bounded handshake,
+  requests, cancellation and shutdown, plus error/fallback integration guidance.
+
 - Add a versioned `serve --stdio` REST worker with request IDs, bounded concurrency
   and output, cancellation/deadlines, shared connections and process-level read-only
   enforcement. Document negotiation, shutdown and no-replay semantics.
@@ -36,6 +39,13 @@ and releases use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Load command operations and network transports only when needed, reducing
   help, configuration and validation startup costs while preserving cancellation
   across asynchronous module loading.
+
+### Fixed
+
+- Preserve mixed-case platform environment variables such as Windows `Path` when
+  starting the stdio demo worker, while keeping credentials isolated.
+- Avoid a repeated `error:` prefix in plain-text diagnostics such as stdout drain
+  timeouts, preserving the existing JSON error format.
 
 ## [0.5.0] - 2026-10-01
 

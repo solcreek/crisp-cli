@@ -57,6 +57,17 @@ export function installedPackageSmoke(spec, version, expectedEvents) {
     assert.equal(worker[0].capabilities.read_only, true)
     assert.equal(worker[1].type, "bye")
     assert.equal(worker.length, 2)
+    const example = execFileSync(
+      process.execPath,
+      [resolve(directory, "node_modules/crispctl/examples/stdio-client.mjs")],
+      { cwd: directory, env, encoding: "utf8", timeout: 15_000 },
+    )
+    assert.deepEqual(JSON.parse(example), {
+      protocol: 1,
+      read_only: true,
+      responses: 2,
+      closed: true,
+    })
     assert.match(run(["--help"]), /listen/)
     const replyHelp = run(["reply", "--help"])
     for (const flag of ["--text", "--note", "--json", "--read-only"])
